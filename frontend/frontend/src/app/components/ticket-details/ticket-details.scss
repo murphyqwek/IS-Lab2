@@ -1,0 +1,31 @@
+:host { display: block; font-family: Verdana, Geneva, Tahoma, sans-serif; }
+.page { max-width: 1100px; margin: 0 auto; padding: 28px; }
+.top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.back { color: #3f5efb; font-weight: 700; text-decoration: none; }
+.actions { display: flex; gap: 8px; }
+.hero { display: flex; justify-content: space-between; align-items: center; padding: 20px; margin-bottom: 18px; border: 2px solid black; border-radius: 8px; }
+.eyebrow { color: #6d6d6d; font-size: 11px; font-weight: 700; }
+h1 { margin: 5px 0; }
+.date { color: #777; font-size: 12px; }
+.price { min-width: 90px; padding: 16px; text-align: center; border-radius: 8px; color: white; font-size: 30px; font-weight: 700; background: linear-gradient(90deg, rgba(63,94,251,1), rgba(200,72,226,1)); }
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+.card { border: 1px solid #333; border-radius: 7px; overflow: hidden; }
+.card-head { padding: 8px 11px; background: rgba(63, 94, 251, 1); color: white; font-weight: 700; }
+dl { margin: 0; }
+dl div { display: grid; grid-template-columns: 130px 1fr; border-top: 1px solid #ddd; }
+dt, dd { margin: 0; padding: 9px 11px; word-break: break-word; }
+dt { font-size: 12px; font-weight: 700; background: #fafafa; }
+dd { font-size: 13px; }
+.person-card { grid-column: 1 / -1; }
+.nested { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px; padding: 10px; border: 1px dashed #777; border-radius: 6px; font-size: 12px; }
+.empty, .state { padding: 25px; color: #666; text-align: center; }
+.message { margin-bottom: 14px; padding: 10px; border-radius: 6px; }
+.error { border: 1px solid #d70f0f; background: #fff0f0; color: #a30c0c; }
+button { height: 38px; padding: 0 14px; font-family: inherit; cursor: pointer; }
+.black-btn { border: 0; animation: unhover .35s forwards; }
+.black-btn:hover { animation: hover .35s forwards; }
+.danger-btn { border: 1px solid #c1121f; background: white; color: #c1121f; }
+.danger-btn:hover { background: #c1121f; color: white; }
+@keyframes hover { from { background: black; color: white; } to { background: white; color: black; box-shadow: inset 0 0 0 1px black; } }
+@keyframes unhover { from { background: white; color: black; } to { background: black; color: white; } }
+@media (max-width: 806px) { .page { padding: 18px 10px; } .cards { grid-template-columns: 1fr; } .person-card { grid-column: auto; } .hero { align-items: flex-start; gap: 12px; } .price { min-width: auto; font-size: 20px; } dl div { grid-template-columns: 110px 1fr; } }

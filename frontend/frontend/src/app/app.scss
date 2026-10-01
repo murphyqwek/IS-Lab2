@@ -1,0 +1,22 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  font-family: Verdana, Geneva, Tahoma, sans-serif;
+}
+
+.app-shell {
+  min-height: 100vh;
+  background: #fff;
+}
+
+.page-content {
+  padding-top: 72px;
+  min-height: calc(100vh - 72px);
+}
+
+@media (max-width: 806px) {
+  .page-content {
+    padding-top: 112px;
+    min-height: calc(100vh - 112px);
+  }
+}

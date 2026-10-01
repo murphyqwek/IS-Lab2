@@ -1,0 +1,85 @@
+<section class="page">
+  <div class="title">
+    <h1>Специальные функции</h1>
+  </div>
+
+  <div class="operations">
+    <section class="card">
+      <div class="card-head">Максимальный Ticket.type</div>
+      <div class="card-body">
+        <p>Вернуть один любой объект, значение поля type которого максимально.</p>
+        <button class="black-btn" (click)="maxType()">Выполнить</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">Количество по Venue</div>
+      <div class="card-body">
+        <p>Вернуть количество билетов, значение venue которых меньше заданного.</p>
+        <label>Venue ID<input [(ngModel)]="venueId" name="venueId" type="number" min="1" /></label>
+        <button class="black-btn" (click)="countVenueLess()">Посчитать</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">Уникальные Venue</div>
+      <div class="card-body">
+        <p>Вернуть массив уникальных значений поля venue.</p>
+        <button class="black-btn" (click)="uniqueVenues()">Получить</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">Копия VIP ×2</div>
+      <div class="card-body">
+        <p>Скопировать билет, сделать категорию VIP и удвоить цену.</p>
+        <label>Ticket ID<input [(ngModel)]="vipTicketId" name="vipTicketId" type="number" min="1" /></label>
+        <button class="black-btn" (click)="copyVip()">Создать копию</button>
+      </div>
+    </section>
+
+    <section class="card wide">
+      <div class="card-head">Копия со скидкой</div>
+      <div class="card-body inline-form">
+        <div>
+          <p>Создать билет на основе указанного, задать скидку и увеличить цену на ту же сумму.</p>
+        </div>
+        <label>Ticket ID<input [(ngModel)]="discountTicketId" name="discountTicketId" type="number" min="1" /></label>
+        <label>Discount, %<input [(ngModel)]="discount" name="discount" type="number" min="1" max="100" /></label>
+        <button class="black-btn" (click)="copyDiscount()">Создать</button>
+      </div>
+    </section>
+  </div>
+
+  @if (error()) { <div class="result error preline">{{ error() }}</div> }
+  @if (message()) { <div class="result success">{{ message() }}</div> }
+
+  @if (countResult() !== null) {
+    <section class="result-panel"><strong>Результат:</strong> {{ countResult() }}</section>
+  }
+
+  @if (ticketResult(); as ticket) {
+    <section class="result-panel">
+      <h3>Ticket #{{ ticket.id }} — {{ ticket.name }}</h3>
+      <div class="ticket-grid">
+        <span><b>Price:</b> {{ ticket.price }}</span>
+        <span><b>Type:</b> {{ ticket.ticketType || '—' }}</span>
+        <span><b>Discount:</b> {{ ticket.discount }}%</span>
+        <span><b>Number:</b> {{ ticket.number ?? '—' }}</span>
+        <span><b>Event:</b> {{ ticket.event.name }}</span>
+        <span><b>Venue:</b> {{ ticket.venue?.name || '—' }}</span>
+      </div>
+    </section>
+  }
+
+  @if (venuesResult().length) {
+    <section class="result-panel">
+      <h3>Уникальные Venue</h3>
+      <div class="venue-list">
+        @for (venue of venuesResult(); track venue.id) {
+          <div><b>#{{ venue.id }} {{ venue.name }}</b><span>capacity: {{ venue.capacity }}</span><span>type: {{ venue.venueType || '—' }}</span></div>
+        }
+      </div>
+    </section>
+  }
+</section>

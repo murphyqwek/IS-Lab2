@@ -1,0 +1,128 @@
+<section class="page">
+  <div class="title-row">
+    <div>
+      <h1>Билеты</h1>
+      <p>CRUD, полное совпадение строковых фильтров, серверная сортировка и пагинация.</p>
+    </div>
+    <button class="black-btn" type="button" (click)="openCreate()">+ Новый билет</button>
+  </div>
+
+  <section class="filter-card">
+    <div class="card-head">Фильтрация и сортировка</div>
+    <div class="filters">
+      <label>Name <input [(ngModel)]="name" name="filterName" placeholder="Полное совпадение" (keyup.enter)="applyFilters()" /></label>
+      <label>Event name <input [(ngModel)]="eventName" name="filterEventName" placeholder="Полное совпадение" (keyup.enter)="applyFilters()" /></label>
+      <label>Event description <input [(ngModel)]="eventDescription" name="filterDescription" placeholder="Полное совпадение" (keyup.enter)="applyFilters()" /></label>
+      <label>Venue name <input [(ngModel)]="venueName" name="filterVenue" placeholder="Полное совпадение" (keyup.enter)="applyFilters()" /></label>
+      <label>
+        Сортировать по
+        <select [(ngModel)]="sortBy" name="sortBy">
+          @for (option of sortOptions; track option.value) {
+            <option [value]="option.value">{{ option.label }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Направление
+        <select [(ngModel)]="direction" name="direction">
+          <option value="ASC">ASC</option>
+          <option value="DESC">DESC</option>
+        </select>
+      </label>
+      <label>
+        На странице
+        <select [(ngModel)]="pageSize" name="pageSize" (change)="applyFilters()">
+          <option [ngValue]="5">5</option>
+          <option [ngValue]="10">10</option>
+          <option [ngValue]="20">20</option>
+          <option [ngValue]="50">50</option>
+        </select>
+      </label>
+      <div class="filter-actions">
+        <button class="black-btn" type="button" (click)="applyFilters()">Применить</button>
+        <button class="outline-btn" type="button" (click)="resetFilters()">Сбросить</button>
+      </div>
+    </div>
+  </section>
+
+  @if (error()) {
+    <div class="message error preline">{{ error() }}</div>
+  }
+
+  <section class="table-card">
+    @if (loading()) {
+      <div class="state">Загрузка...</div>
+    } @else if (!page()?.content?.length) {
+      <div class="state">Билеты не найдены.</div>
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Coordinates</th>
+              <th>Creation date</th>
+              <th>Person</th>
+              <th>Event</th>
+              <th>Price</th>
+              <th>Type</th>
+              <th>Discount</th>
+              <th>Number</th>
+              <th>Venue</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (ticket of page()!.content; track ticket.id) {
+              <tr>
+                <td><a class="id-link" [routerLink]="['/tickets', ticket.id]">#{{ ticket.id }}</a></td>
+                <td>{{ ticket.name }}</td>
+                <td>#{{ ticket.coordinates.id }}<br>({{ ticket.coordinates.x }}, {{ ticket.coordinates.y }})</td>
+                <td>{{ ticket.creationDate ? (ticket.creationDate | date:'dd.MM.yyyy HH:mm:ss') : '—' }}</td>
+                <td>
+                  @if (ticket.person) {
+                    #{{ ticket.person.id }}<br>
+                    {{ ticket.person.nationality || '—' }}, {{ ticket.person.weight ?? '—' }} kg
+                  } @else { — }
+                </td>
+                <td>#{{ ticket.event.id }}<br>{{ ticket.event.name }}<br><small>{{ ticket.event.eventType || '—' }}</small></td>
+                <td>{{ ticket.price }}</td>
+                <td>{{ ticket.ticketType || '—' }}</td>
+                <td>{{ ticket.discount }}%</td>
+                <td>{{ ticket.number ?? '—' }}</td>
+                <td>
+                  @if (ticket.venue) {
+                    #{{ ticket.venue.id }}<br>{{ ticket.venue.name }}<br><small>{{ ticket.venue.venueType || '—' }}</small>
+                  } @else { — }
+                </td>
+                <td class="actions-cell">
+                  <a class="small-btn view" [routerLink]="['/tickets', ticket.id]">Открыть</a>
+                  <button class="small-btn" type="button" (click)="openEdit(ticket)">Изменить</button>
+                  <button class="small-btn danger" type="button" (click)="delete(ticket)">Удалить</button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination">
+        <button class="page-btn" type="button" [disabled]="page()!.first" (click)="previousPage()">← Назад</button>
+        <span class="page-info">
+          Страница {{ page()!.number + 1 }} / {{ page()!.totalPages || 1 }} · всего {{ page()!.totalElements }}
+        </span>
+        <button class="page-btn" type="button" [disabled]="page()!.last" (click)="nextPage()">Вперёд →</button>
+      </div>
+    }
+  </section>
+</section>
+
+@if (showForm) {
+  <app-ticket-form
+    [ticket]="editingTicket"
+    [serverError]="error()"
+    (cancelled)="closeForm()"
+    (submitted)="save($event)"
+  />
+}

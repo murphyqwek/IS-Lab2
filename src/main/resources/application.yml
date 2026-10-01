@@ -1,0 +1,19 @@
+server:
+  port: 2720
+
+spring:
+    datasource:
+      url: ${POSTGRES_URL}
+      username: ${POSTGRES_USERNAME}
+      password: ${POSTGRES_PASSWORD}
+      hikari:
+        maximum-pool-size: 2
+        minimum-idle: 1
+
+    jpa:
+      hibernate:
+        ddl-auto: update
+      show-sql: true
+      properties:
+        hibernate:
+          format_sql: true

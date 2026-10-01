@@ -1,0 +1,94 @@
+<section class="page">
+  <div class="top-row">
+    <a class="back" routerLink="/tickets">← К списку</a>
+    @if (ticket()) {
+      <div class="actions">
+        <button class="black-btn" type="button" (click)="showEdit = true">Изменить</button>
+        <button class="danger-btn" type="button" (click)="delete()">Удалить</button>
+      </div>
+    }
+  </div>
+
+  @if (error()) { <div class="message error">{{ error() }}</div> }
+
+  @if (loading()) {
+    <div class="state">Загрузка...</div>
+  } @else if (ticket(); as t) {
+    <div class="hero">
+      <div>
+        <div class="eyebrow">TICKET #{{ t.id }}</div>
+        <h1>{{ t.name }}</h1>
+        <div class="date">Создан: {{ t.creationDate | date:'dd.MM.yyyy HH:mm:ss' }}</div>
+      </div>
+      <div class="price">{{ t.price }}</div>
+    </div>
+
+    <div class="cards">
+      <section class="card">
+        <div class="card-head">Основные поля</div>
+        <dl>
+          <div><dt>Type</dt><dd>{{ t.ticketType || '—' }}</dd></div>
+          <div><dt>Discount</dt><dd>{{ t.discount }}%</dd></div>
+          <div><dt>Number</dt><dd>{{ t.number ?? '—' }}</dd></div>
+        </dl>
+      </section>
+
+      <section class="card">
+        <div class="card-head">Coordinates #{{ t.coordinates.id }}</div>
+        <dl>
+          <div><dt>X</dt><dd>{{ t.coordinates.x }}</dd></div>
+          <div><dt>Y</dt><dd>{{ t.coordinates.y }}</dd></div>
+        </dl>
+      </section>
+
+      <section class="card">
+        <div class="card-head">Event #{{ t.event.id }}</div>
+        <dl>
+          <div><dt>Name</dt><dd>{{ t.event.name }}</dd></div>
+          <div><dt>Description</dt><dd>{{ t.event.description }}</dd></div>
+          <div><dt>Type</dt><dd>{{ t.event.eventType || '—' }}</dd></div>
+        </dl>
+      </section>
+
+      <section class="card">
+        <div class="card-head">Venue</div>
+        @if (t.venue) {
+          <dl>
+            <div><dt>ID</dt><dd>#{{ t.venue.id }}</dd></div>
+            <div><dt>Name</dt><dd>{{ t.venue.name }}</dd></div>
+            <div><dt>Capacity</dt><dd>{{ t.venue.capacity }}</dd></div>
+            <div><dt>Type</dt><dd>{{ t.venue.venueType || '—' }}</dd></div>
+          </dl>
+        } @else { <div class="empty">Не указан</div> }
+      </section>
+
+      <section class="card person-card">
+        <div class="card-head">Person</div>
+        @if (t.person) {
+          <dl>
+            <div><dt>ID</dt><dd>#{{ t.person.id }}</dd></div>
+            <div><dt>Eye color</dt><dd>{{ t.person.eyeColor || '—' }}</dd></div>
+            <div><dt>Hair color</dt><dd>{{ t.person.hairColor || '—' }}</dd></div>
+            <div><dt>Weight</dt><dd>{{ t.person.weight ?? '—' }}</dd></div>
+            <div><dt>Nationality</dt><dd>{{ t.person.nationality || '—' }}</dd></div>
+          </dl>
+
+          <div class="nested">
+            <strong>Location</strong>
+            @if (t.person.location) {
+              <span>#{{ t.person.location.id }}</span>
+              <span>X: {{ t.person.location.x }}</span>
+              <span>Y: {{ t.person.location.y }}</span>
+              <span>Z: {{ t.person.location.z }}</span>
+              <span>Name: {{ t.person.location.name || '—' }}</span>
+            } @else { <span>не указан</span> }
+          </div>
+        } @else { <div class="empty">Не указан</div> }
+      </section>
+    </div>
+  }
+</section>
+
+@if (showEdit && ticket()) {
+  <app-ticket-form [ticket]="ticket()" [serverError]="error()" (cancelled)="showEdit = false" (submitted)="update($event)" />
+}

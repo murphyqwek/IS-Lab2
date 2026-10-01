@@ -1,0 +1,12 @@
+<header>
+  <nav>
+    <a routerLink="/tickets" routerLinkActive="active">Билеты</a>
+    <a routerLink="/references" routerLinkActive="active">Справочники</a>
+    <a routerLink="/operations" routerLinkActive="active">Спец. операции</a>
+  </nav>
+
+  <div class="socket-state" [class.online]="realtime.connected()">
+    <span class="dot"></span>
+    {{ realtime.connected() ? 'online' : 'offline' }}
+  </div>
+</header>

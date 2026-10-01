@@ -1,0 +1,123 @@
+<section class="page">
+  <div class="title-row">
+    <div>
+      <h1>Справочники</h1>
+    </div>
+    <button class="black-btn" type="button" (click)="openCreate(tab)">+ Создать</button>
+  </div>
+
+  <div class="tabs">
+    <button [class.active]="tab === 'coordinates'" (click)="setTab('coordinates')">Coordinates</button>
+    <button [class.active]="tab === 'events'" (click)="setTab('events')">Events</button>
+    <button [class.active]="tab === 'venues'" (click)="setTab('venues')">Venues</button>
+    <button [class.active]="tab === 'locations'" (click)="setTab('locations')">Locations</button>
+    <button [class.active]="tab === 'persons'" (click)="setTab('persons')">Persons</button>
+  </div>
+
+  @if (error()) { <div class="message error preline">{{ error() }}</div> }
+
+  @if (loading()) {
+    <div class="state">Загрузка...</div>
+  } @else {
+    <div class="table-wrap">
+      @switch (tab) {
+        @case ('coordinates') {
+          <table><thead><tr><th>ID</th><th>X</th><th>Y</th><th>Действия</th></tr></thead><tbody>
+            @for (item of data().coordinates; track item.id) {
+              <tr><td>#{{ item.id }}</td><td>{{ item.x }}</td><td>{{ item.y }}</td><td class="actions"><button (click)="openEdit('coordinates', item)">Изменить</button><button class="danger" (click)="openDelete('coordinates', item)">Удалить</button></td></tr>
+            }
+          </tbody></table>
+        }
+        @case ('events') {
+          <table><thead><tr><th>ID</th><th>Name</th><th>Description</th><th>Type</th><th>Действия</th></tr></thead><tbody>
+            @for (item of data().events; track item.id) {
+              <tr><td>#{{ item.id }}</td><td>{{ item.name }}</td><td>{{ item.description }}</td><td>{{ item.eventType || '—' }}</td><td class="actions"><button (click)="openEdit('events', item)">Изменить</button><button class="danger" (click)="openDelete('events', item)">Удалить</button></td></tr>
+            }
+          </tbody></table>
+        }
+        @case ('venues') {
+          <table><thead><tr><th>ID</th><th>Name</th><th>Capacity</th><th>Type</th><th>Действия</th></tr></thead><tbody>
+            @for (item of data().venues; track item.id) {
+              <tr><td>#{{ item.id }}</td><td>{{ item.name }}</td><td>{{ item.capacity }}</td><td>{{ item.venueType || '—' }}</td><td class="actions"><button (click)="openEdit('venues', item)">Изменить</button><button class="danger" (click)="openDelete('venues', item)">Удалить</button></td></tr>
+            }
+          </tbody></table>
+        }
+        @case ('locations') {
+          <table><thead><tr><th>ID</th><th>X</th><th>Y</th><th>Z</th><th>Name</th><th>Действия</th></tr></thead><tbody>
+            @for (item of data().locations; track item.id) {
+              <tr><td>#{{ item.id }}</td><td>{{ item.x }}</td><td>{{ item.y }}</td><td>{{ item.z }}</td><td>{{ item.name || '—' }}</td><td class="actions"><button (click)="openEdit('locations', item)">Изменить</button><button class="danger" (click)="openDelete('locations', item)">Удалить</button></td></tr>
+            }
+          </tbody></table>
+        }
+        @case ('persons') {
+          <table><thead><tr><th>ID</th><th>Eye</th><th>Hair</th><th>Weight</th><th>Nationality</th><th>Location</th><th>Действия</th></tr></thead><tbody>
+            @for (item of data().persons; track item.id) {
+              <tr><td>#{{ item.id }}</td><td>{{ item.eyeColor || '—' }}</td><td>{{ item.hairColor || '—' }}</td><td>{{ item.weight ?? '—' }}</td><td>{{ item.nationality || '—' }}</td><td>@if (item.location) { #{{ item.location.id }} — {{ item.location.name || 'без имени' }} } @else { — }</td><td class="actions"><button (click)="openEdit('persons', item)">Изменить</button><button class="danger" (click)="openDelete('persons', item)">Удалить</button></td></tr>
+            }
+          </tbody></table>
+        }
+      }
+    </div>
+  }
+</section>
+
+@if (editorType) {
+  <div class="backdrop" (click)="closeEditor()">
+    <section class="dialog" (click)="$event.stopPropagation()">
+      <div class="dialog-head">
+        <h2>{{ editingId == null ? 'Создание' : 'Редактирование #' + editingId }} · {{ editorType }}</h2>
+        <button type="button" (click)="closeEditor()">×</button>
+      </div>
+      <div class="dialog-body">
+        @if (formError) { <div class="message error preline">{{ formError }}</div> }
+
+        @switch (editorType) {
+          @case ('coordinates') {
+            <div class="grid"><label>X<input [(ngModel)]="x" name="cx" type="number" step="any" /></label><label>Y<input [(ngModel)]="y" name="cy" type="number" step="any" /></label></div>
+          }
+          @case ('events') {
+            <div class="grid"><label>Name<input [(ngModel)]="name" name="eventName" /></label><label>Type<select [(ngModel)]="eventType" name="eventType"><option value="">—</option>@for (type of eventTypes; track type) { <option [value]="type">{{ type }}</option> }</select></label><label class="wide">Description<textarea [(ngModel)]="description" name="description" rows="4"></textarea></label></div>
+          }
+          @case ('venues') {
+            <div class="grid"><label>Name<input [(ngModel)]="name" name="venueName" /></label><label>Capacity<input [(ngModel)]="capacity" name="capacity" type="number" min="1" step="1" /></label><label>Type<select [(ngModel)]="venueType" name="venueType"><option value="">—</option>@for (type of venueTypes; track type) { <option [value]="type">{{ type }}</option> }</select></label></div>
+          }
+          @case ('locations') {
+            <div class="grid"><label>X<input [(ngModel)]="x" name="lx" type="number" step="any" /></label><label>Y<input [(ngModel)]="y" name="ly" type="number" step="1" /></label><label>Z<input [(ngModel)]="z" name="lz" type="number" step="1" /></label><label>Name<input [(ngModel)]="name" name="locationName" maxlength="692" /></label></div>
+          }
+          @case ('persons') {
+            <div class="grid">
+              <label>Eye color<select [(ngModel)]="eyeColor" name="eyeColor"><option value="">—</option>@for (color of colors; track color) { <option [value]="color">{{ color }}</option> }</select></label>
+              <label>Hair color<select [(ngModel)]="hairColor" name="hairColor"><option value="">—</option>@for (color of colors; track color) { <option [value]="color">{{ color }}</option> }</select></label>
+              <label>Weight<input [(ngModel)]="weight" name="weight" type="number" min="0.000001" step="any" /></label>
+              <label>Nationality<select [(ngModel)]="nationality" name="nationality"><option value="">—</option>@for (country of countries; track country) { <option [value]="country">{{ country }}</option> }</select></label>
+            </div>
+            <div class="nested">
+              <h3>Location</h3>
+              <div class="modes"><label><input type="radio" name="personLocationMode" value="none" [(ngModel)]="personLocationMode" /> нет</label><label><input type="radio" name="personLocationMode" value="existing" [(ngModel)]="personLocationMode" /> существующий</label><label><input type="radio" name="personLocationMode" value="new" [(ngModel)]="personLocationMode" /> новый</label></div>
+              @if (personLocationMode === 'existing') {
+                <label>Location<select [(ngModel)]="personLocationId" name="personLocationId"><option [ngValue]="null">— выбери —</option>@for (item of data().locations; track item.id) { <option [ngValue]="item.id">#{{ item.id }} — {{ item.name || 'без имени' }}</option> }</select></label>
+              } @else if (personLocationMode === 'new') {
+                <div class="grid"><label>X<input [(ngModel)]="locationX" name="plx" type="number" step="any" /></label><label>Y<input [(ngModel)]="locationY" name="ply" type="number" step="1" /></label><label>Z<input [(ngModel)]="locationZ" name="plz" type="number" step="1" /></label><label>Name<input [(ngModel)]="locationName" name="plname" maxlength="692" /></label></div>
+              }
+            </div>
+          }
+        }
+      </div>
+      <div class="dialog-actions"><button class="outline" (click)="closeEditor()">Отмена</button><button class="black-btn" (click)="save()">Сохранить</button></div>
+    </section>
+  </div>
+}
+
+@if (deleteType && deleteEntity) {
+  <div class="backdrop" (click)="closeDelete()">
+    <section class="dialog small" (click)="$event.stopPropagation()">
+      <div class="dialog-head"><h2>Удаление {{ deleteType }}</h2><button type="button" (click)="closeDelete()">×</button></div>
+      <div class="dialog-body">
+        <p>Удалить {{ entityLabel(deleteEntity) }}?</p>
+        <p class="hint">Если объект используется, выбери замену. Backend перепривяжет связанные объекты перед удалением.</p>
+        <label>Replacement<select [(ngModel)]="replacementId" name="replacementId"><option [ngValue]="null">— без замены —</option>@for (item of replacementCandidates(); track item.id) { <option [ngValue]="item.id">{{ entityLabel(item) }}</option> }</select></label>
+      </div>
+      <div class="dialog-actions"><button class="outline" (click)="closeDelete()">Отмена</button><button class="delete-confirm" (click)="confirmDelete()">Удалить</button></div>
+    </section>
+  </div>
+}

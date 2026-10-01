@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:18-alpine3.23
+    container_name: is-lab-database
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: studs
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
