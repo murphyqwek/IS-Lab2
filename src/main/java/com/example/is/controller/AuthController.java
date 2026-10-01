@@ -53,11 +53,7 @@ public class AuthController {
 
         SecurityContextHolder.setContext(context);
 
-        httpRequest.getSession(true)
-                .setAttribute(
-                        "SPRING_SECURITY_CONTEXT",
-                        context
-                );
+        httpRequest.getSession(true).setAttribute("SPRING_SECURITY_CONTEXT", context);
 
 
         return new AuthResponse(
