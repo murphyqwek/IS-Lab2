@@ -5,6 +5,7 @@ import com.example.is.entity.UserRole;
 import com.example.is.exception.UserAlreadyExistException;
 import com.example.is.repository.UserRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +31,11 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(password));
         user.setRole(UserRole.USER);
 
-        return userRepository.save(user);
+        try {
+            return userRepository.save(user);
+        }
+        catch (DataIntegrityViolationException e) {
+            throw new UserAlreadyExistException();
+        }
     }
 }
