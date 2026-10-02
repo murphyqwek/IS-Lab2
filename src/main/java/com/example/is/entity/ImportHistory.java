@@ -11,9 +11,6 @@ public class ImportHistory {
     private Long id;
 
     @Column(nullable = false)
-    private String filename;
-
-    @Column(nullable = false)
     private String username;
 
     @Column(nullable = false)
@@ -22,8 +19,40 @@ public class ImportHistory {
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ImportHistoryStatus status;
+
     @PrePersist
     private void onCreate() {
         createdAt = Instant.now();
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public Integer getImportedObjectsCount() {
+        return importedObjectsCount;
+    }
+
+    public void setImportedObjectsCount(Integer importedObjectsCount) {
+        this.importedObjectsCount = importedObjectsCount;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setStatus(ImportHistoryStatus status) {
+        this.status = status;
+    }
+
+    public ImportHistoryStatus getStatus() {
+        return status;
     }
 }
