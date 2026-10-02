@@ -1,0 +1,35 @@
+{
+  "tickets": [
+    {
+      "name": "VIP Rock Ticket",
+
+      "coordinates": {
+        "newObject": {
+          "x": 10.5,
+          "y": 20.0
+        }
+      },
+
+      "event": {
+        "newObject": {
+          "name": "Rock Concert",
+          "description": "Evening rock concert",
+          "eventType": "CONCERT"
+        }
+      },
+
+      "price": 5000,
+      "ticketType": "VIP",
+      "discount": 10,
+      "number": 1.0,
+
+      "venue": {
+        "newObject": {
+          "name": "Main Loft",
+          "capacity": 500,
+          "venueType": "LOFT"
+        }
+      }
+    }
+  ]
+}

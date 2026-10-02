@@ -1,0 +1,67 @@
+{
+  "coordinates": [
+    {
+      "x": 10.5,
+      "y": 20.0
+    },
+    {
+      "x": -15.25,
+      "y": 0.0
+    }
+  ],
+  "events": [
+    {
+      "name": "Concert",
+      "description": "Main autumn concert",
+      "eventType": null
+    },
+    {
+      "name": "Conference",
+      "description": "Backend developers conference",
+      "eventType": null
+    }
+  ],
+  "persons": [
+    {
+      "eyeColor": null,
+      "hairColor": null,
+      "location": null,
+      "weight": 75.5,
+      "nationality": null
+    },
+    {
+      "eyeColor": null,
+      "hairColor": null,
+      "location": null,
+      "weight": 62.0,
+      "nationality": null
+    }
+  ],
+  "venues": [
+    {
+      "name": "Main Hall",
+      "capacity": 1000,
+      "venueType": null
+    },
+    {
+      "name": "Small Hall",
+      "capacity": 150,
+      "venueType": null
+    }
+  ],
+  "locations": [
+    {
+      "x": 1.5,
+      "y": 10,
+      "z": 20,
+      "name": "North entrance"
+    },
+    {
+      "x": -5.0,
+      "y": 0,
+      "z": 100,
+      "name": "South entrance"
+    }
+  ],
+  "tickets": []
+}

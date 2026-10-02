@@ -1,0 +1,14 @@
+$kind: http-request
+description: ""
+url: http://localhost:2721/api/import
+method: POST
+body:
+  type: formdata
+  content:
+    - type: file
+      key: file
+      src:
+        - /D:/Project/ITMO/IS-Lab2/json/ticket-import.json
+      description: ""
+      disabled: false
+order: 1790940771433
