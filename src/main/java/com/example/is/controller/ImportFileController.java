@@ -3,6 +3,7 @@ package com.example.is.controller;
 import com.example.is.service.FileImportService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -18,6 +19,7 @@ public class ImportFileController {
     @PostMapping
     @ResponseStatus(HttpStatus.ACCEPTED)
     public void importFile(@RequestParam MultipartFile file, Authentication authentication) {
-        fileImportService.importFile(file, authentication.getName());
+        UserDetails user = (UserDetails) authentication.getPrincipal();
+        fileImportService.importFile(file, user.getUsername());
     }
 }
