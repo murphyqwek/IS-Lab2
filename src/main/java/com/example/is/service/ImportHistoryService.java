@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 @Service
 public class ImportHistoryService {
@@ -26,16 +27,51 @@ public class ImportHistoryService {
         this.mapper = mapper;
     }
 
+    private List<ImportHistory> getPageUser(ImportHistoryDTO dto, Pageable pageable) {
+        List<ImportHistory> histories;
+
+        if (dto.cursorCreatedAt() == null && dto.cursorId() == null) {
+            histories = importHistoryRepository.findFirstPageUser(dto.username(), pageable);
+        }
+        else {
+            histories = importHistoryRepository.findNextPageUser(
+                    dto.cursorCreatedAt(),
+                    dto.cursorId(),
+                    dto.username(),
+                    pageable
+            );
+        }
+
+        return histories;
+    }
+
+    private List<ImportHistory> getPageAdmin(ImportHistoryDTO dto, Pageable pageable) {
+        List<ImportHistory> histories;
+
+        if (dto.cursorCreatedAt() == null && dto.cursorId() == null) {
+            histories = importHistoryRepository.findFirstPage(pageable);
+        }
+        else {
+            histories = importHistoryRepository.findNextPage(
+                    dto.cursorCreatedAt(),
+                    dto.cursorId(),
+                    pageable
+            );
+        }
+
+        return histories;
+    }
+
     public CursorPage<ImportHistoryResponse> getHistory(ImportHistoryDTO dto) {
         Pageable pageable = PageRequest.of(0, dto.size() + 1);
 
         List<ImportHistory> histories;
 
         if(dto.role() == UserRole.ADMIN) {
-            histories = importHistoryRepository.findNextPage(dto.cursorCreatedAt(), dto.cursorId(), pageable);
+            histories = getPageAdmin(dto, pageable);
         }
         else {
-            histories = importHistoryRepository.findNextPageUser(dto.cursorCreatedAt(), dto.cursorId(), dto.username(), pageable);
+            histories = getPageUser(dto, pageable);
         }
 
         boolean hasNext = histories.size() > dto.size();

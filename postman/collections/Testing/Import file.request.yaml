@@ -8,7 +8,7 @@ body:
     - type: file
       key: file
       src:
-        - /D:/Project/ITMO/IS-Lab2/json/ticket-import.json
+        - /D:/Project/ITMO/IS-Lab2/json/valid-import.json
       description: ""
       disabled: false
 order: 1790940771433

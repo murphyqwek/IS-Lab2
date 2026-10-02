@@ -12,12 +12,19 @@ import org.springframework.data.domain.Pageable;
 
 @Repository
 public interface ImportHistoryRepository extends JpaRepository<ImportHistory, Long> {
+
+    @Query("""
+        SELECT h
+        FROM ImportHistory h
+        ORDER BY h.createdAt DESC, h.id DESC
+    """)
+    List<ImportHistory> findFirstPage(Pageable pageable);
+
     @Query("""
         SELECT h
         FROM ImportHistory h
         WHERE
-            :cursorCreatedAt IS NULL
-            OR h.createdAt < :cursorCreatedAt
+            h.createdAt < :cursorCreatedAt
             OR (
                 h.createdAt = :cursorCreatedAt
                 AND h.id < :cursorId
@@ -33,12 +40,21 @@ public interface ImportHistoryRepository extends JpaRepository<ImportHistory, Lo
     @Query("""
         SELECT h
         FROM ImportHistory h
+        WHERE h.username = :username
+        ORDER BY h.createdAt DESC, h.id DESC
+    """)
+    List<ImportHistory> findFirstPageUser(
+            @Param("username") String username,
+            Pageable pageable
+    );
+
+    @Query("""
+        SELECT h
+        FROM ImportHistory h
         WHERE
             h.username = :username
-            AND 
-            (
-                :cursorCreatedAt IS NULL
-                OR h.createdAt < :cursorCreatedAt
+            AND (
+                h.createdAt < :cursorCreatedAt
                 OR (
                     h.createdAt = :cursorCreatedAt
                     AND h.id < :cursorId

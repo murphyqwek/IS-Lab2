@@ -1,0 +1,5 @@
+$kind: http-request
+description: ""
+url: http://localhost:2721/api/history
+method: GET
+order: 4486370219774214
