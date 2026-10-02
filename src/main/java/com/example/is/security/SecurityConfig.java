@@ -22,9 +22,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**")
                         .permitAll()
 
-                        .requestMatchers("/api/import/**")
-                        .permitAll()
-
                         .anyRequest()
                         .authenticated()
                 )

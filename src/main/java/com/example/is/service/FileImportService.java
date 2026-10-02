@@ -1,5 +1,6 @@
 package com.example.is.service;
 
+import com.example.is.dto.file.ImportFileDTO;
 import com.example.is.exception.FileImportException;
 import com.example.is.file.FileParser;
 import jakarta.transaction.Transactional;
@@ -23,13 +24,16 @@ public class FileImportService {
     private final VenueService venueService;
     private final TicketService ticketService;
 
+    private final ImportHistoryService importHistoryService;
+
     public FileImportService(FileParser fileParser,
                              CoordinatesService coordinatesService,
                              EventService eventService,
                              PersonService personService,
                              LocationService locationService,
                              VenueService venueService,
-                             TicketService ticketService) {
+                             TicketService ticketService,
+                             ImportHistoryService importHistoryService) {
         this.fileParser = fileParser;
         this.coordinatesService = coordinatesService;
         this.eventService = eventService;
@@ -37,6 +41,8 @@ public class FileImportService {
         this.locationService = locationService;
         this.venueService = venueService;
         this.ticketService = ticketService;
+
+        this.importHistoryService = importHistoryService;
     }
 
     public <T> void uploadDtos(Consumer<T> uploader, List<T> items, String objectType) {
@@ -59,22 +65,39 @@ public class FileImportService {
         }
     }
 
+    private int getImportedObjectsCount(ImportFileDTO objects) {
+        return objects.getCoordinates().size()
+                + objects.getEvents().size()
+                + objects.getPersons().size()
+                + objects.getVenues().size()
+                + objects.getLocations().size()
+                + objects.getTickets().size();
+    }
+
     @Transactional
-    public void importFile(MultipartFile file) {
+    public void importFile(MultipartFile file, String username) {
         if (file.isEmpty()) {
             throw new FileImportException("Файл пуст");
         }
 
-        var objects = fileParser.parseFile(file);
-
         try {
+            var objects = fileParser.parseFile(file);
+
             uploadDtos(coordinatesService::create, objects.getCoordinates(), "coordinates");
             uploadDtos(eventService::create, objects.getEvents(), "events");
             uploadDtos(personService::create, objects.getPersons(), "persons");
             uploadDtos(venueService::create, objects.getVenues(),  "venues");
             uploadDtos(locationService::create, objects.getLocations(),  "locations");
             uploadDtos(ticketService::create, objects.getTickets(),  "tickets");
+
+            int savedCount = getImportedObjectsCount(objects);
+
+            importHistoryService.saveSuccess(username, savedCount);
+        } catch (FileImportException e) {
+            importHistoryService.saveFailed(username);
+            throw e;
         } catch (Exception e) {
+            importHistoryService.saveFailed(username);
             throw new FileImportException("Не удалось импортировать данные: " + e.getMessage());
         }
     }
