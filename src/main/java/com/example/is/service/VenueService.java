@@ -5,6 +5,7 @@ import com.example.is.dto.request.VenueRequest;
 import com.example.is.dto.response.VenueResponse;
 import com.example.is.entity.Ticket;
 import com.example.is.entity.Venue;
+import com.example.is.exception.BusinessConstraintsException;
 import com.example.is.exception.InvalidReferenceException;
 import com.example.is.exception.ResourceNotFoundException;
 import com.example.is.mapper.VenueMapper;
@@ -70,6 +71,10 @@ public class VenueService {
 
     @Transactional
     public VenueResponse update(Integer id, VenueRequest request) {
+        if(isVenueNameTakenByAnotherEvent(request.name(), id)) {
+            throw new BusinessConstraintsException("Venue с названием " + request.name() + " уже есть. Выберите другое название");
+        }
+
         Venue venue = find(id);
 
         venue.setName(request.name());
@@ -103,6 +108,10 @@ public class VenueService {
     }
 
     private Venue createEntity(VenueRequest request) {
+        if(isVenueNameTaken(request.name())) {
+            throw new BusinessConstraintsException("Venue с названием " + request.name() + " уже есть. Выберите другое название");
+        }
+
         Venue venue = venueMapper.toEntity(request);
         Venue saved = venueRepository.save(venue);
         changePublisher.publish(EntityType.VENUE, ChangeType.CREATED, saved.getId());
@@ -112,5 +121,13 @@ public class VenueService {
     private Venue find(Integer id) {
         return venueRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Venue с id=" + id + " не найден"));
+    }
+
+    private boolean isVenueNameTaken(String venueName) {
+        return venueRepository.existsVenueByName(venueName);
+    }
+
+    private boolean isVenueNameTakenByAnotherEvent(String venueName, Integer id) {
+        return venueRepository.existsVenueByNameAndIdNot(venueName, id);
     }
 }

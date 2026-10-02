@@ -5,6 +5,7 @@ import com.example.is.dto.request.EventRequest;
 import com.example.is.dto.response.EventResponse;
 import com.example.is.entity.Event;
 import com.example.is.entity.Ticket;
+import com.example.is.exception.BusinessConstraintsException;
 import com.example.is.exception.InvalidReferenceException;
 import com.example.is.exception.ResourceNotFoundException;
 import com.example.is.mapper.EventMapper;
@@ -70,6 +71,10 @@ public class EventService {
 
     @Transactional
     public EventResponse update(Integer id, EventRequest request) {
+        if(isEventNameTakenByAnotherEvent(request.name(), id)) {
+            throw new BusinessConstraintsException("Event с названием " + request.name() + " уже есть. Выберите другое название");
+        }
+
         Event event = find(id);
 
         event.setName(request.name());
@@ -103,14 +108,25 @@ public class EventService {
     }
 
     private Event createEntity(EventRequest request) {
+        if(isEventNameTaken(request.name())) {
+            throw new BusinessConstraintsException("Event с названием " + request.name() + " уже есть. Выберите другое название");
+        }
+
         Event event = eventMapper.toEntity(request);
         Event saved = eventRepository.save(event);
         changePublisher.publish(EntityType.EVENT, ChangeType.CREATED, saved.getId());
         return saved;
     }
 
+    private boolean isEventNameTaken(String eventName) {
+        return eventRepository.existsEventByName(eventName);
+    }
+
+    private boolean isEventNameTakenByAnotherEvent(String eventName, Integer id) {
+        return eventRepository.existsEventByNameAndIdNot(eventName, id);
+    }
+
     private Event find(Integer id) {
-        return eventRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Event с id=" + id + " не найден"));
+        return eventRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Event с id=" + id + " не найден"));
     }
 }
