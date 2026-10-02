@@ -1,18 +1,63 @@
 package com.example.is.service;
 
+import com.example.is.dto.history.ImportHistoryDTO;
+import com.example.is.dto.response.CursorPage;
+import com.example.is.dto.response.ImportHistoryResponse;
 import com.example.is.entity.ImportHistory;
 import com.example.is.entity.ImportHistoryStatus;
+import com.example.is.entity.UserRole;
+import com.example.is.mapper.ImportHistoryMapper;
 import com.example.is.repository.ImportHistoryRepository;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 
+import java.util.List;
+
 @Service
 public class ImportHistoryService {
-    private ImportHistoryRepository importHistoryRepository;
+    private final ImportHistoryRepository importHistoryRepository;
+    private final ImportHistoryMapper mapper;
 
-    public ImportHistoryRepository getImportHistoryRepository() {
-        return importHistoryRepository;
+    public ImportHistoryService(ImportHistoryRepository importHistoryRepository, ImportHistoryMapper mapper) {
+        this.importHistoryRepository = importHistoryRepository;
+        this.mapper = mapper;
+    }
+
+    public CursorPage<ImportHistoryResponse> getHistory(ImportHistoryDTO dto) {
+        Pageable pageable = PageRequest.of(0, dto.size() + 1);
+
+        List<ImportHistory> histories;
+
+        if(dto.role() == UserRole.ADMIN) {
+            histories = importHistoryRepository.findNextPage(dto.cursorCreatedAt(), dto.cursorId(), pageable);
+        }
+        else {
+            histories = importHistoryRepository.findNextPageUser(dto.cursorCreatedAt(), dto.cursorId(), dto.username(), pageable);
+        }
+
+        boolean hasNext = histories.size() > dto.size();
+
+        if (hasNext) {
+            histories = histories.subList(0, dto.size());
+        }
+
+        List<ImportHistoryResponse> content = histories.stream().map(mapper::mapToResponse).toList();
+
+        if (histories.isEmpty()) {
+            return new CursorPage<>(content, null, null, false);
+        }
+
+        ImportHistory last = histories.get(histories.size() - 1);
+
+        return new CursorPage<>(
+                content,
+                hasNext ? last.getId() : null,
+                hasNext ? last.getCreatedAt() : null,
+                hasNext
+        );
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

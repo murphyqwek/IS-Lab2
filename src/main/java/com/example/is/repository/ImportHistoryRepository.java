@@ -2,6 +2,54 @@ package com.example.is.repository;
 
 import com.example.is.entity.ImportHistory;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+import java.util.List;
+import org.springframework.data.domain.Pageable;
+
+@Repository
 public interface ImportHistoryRepository extends JpaRepository<ImportHistory, Long> {
+    @Query("""
+        SELECT h
+        FROM ImportHistory h
+        WHERE
+            :cursorCreatedAt IS NULL
+            OR h.createdAt < :cursorCreatedAt
+            OR (
+                h.createdAt = :cursorCreatedAt
+                AND h.id < :cursorId
+            )
+        ORDER BY h.createdAt DESC, h.id DESC
+    """)
+    List<ImportHistory> findNextPage(
+            @Param("cursorCreatedAt") Instant cursorCreatedAt,
+            @Param("cursorId") Long cursorId,
+            Pageable pageable
+    );
+
+    @Query("""
+        SELECT h
+        FROM ImportHistory h
+        WHERE
+            h.username = :username
+            AND 
+            (
+                :cursorCreatedAt IS NULL
+                OR h.createdAt < :cursorCreatedAt
+                OR (
+                    h.createdAt = :cursorCreatedAt
+                    AND h.id < :cursorId
+                )
+            )
+        ORDER BY h.createdAt DESC, h.id DESC
+    """)
+    List<ImportHistory> findNextPageUser(
+            @Param("cursorCreatedAt") Instant cursorCreatedAt,
+            @Param("cursorId") Long cursorId,
+            @Param("username") String username,
+            Pageable pageable
+    );
 }

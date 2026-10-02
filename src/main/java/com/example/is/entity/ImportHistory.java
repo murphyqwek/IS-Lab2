@@ -28,6 +28,10 @@ public class ImportHistory {
         createdAt = Instant.now();
     }
 
+    public Long getId() {
+        return id;
+    }
+
     public String getUsername() {
         return username;
     }
