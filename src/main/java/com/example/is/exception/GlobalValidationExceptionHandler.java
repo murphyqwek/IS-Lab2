@@ -14,9 +14,7 @@ import java.util.Map;
 public class GlobalValidationExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ValidationErrorResponse> handleValidationException(
-            MethodArgumentNotValidException exception
-    ) {
+    public ResponseEntity<ValidationErrorResponse> handleValidationException(MethodArgumentNotValidException exception) {
         Map<String, String> errors = new LinkedHashMap<>();
 
         exception.getBindingResult()
@@ -36,5 +34,10 @@ public class GlobalValidationExceptionHandler {
         );
 
         return ResponseEntity.badRequest().body(response);
+    }
+
+    @ExceptionHandler(BusinessConstraintsException.class)
+    public ResponseEntity<?> handleBusinessConstraintsException(BusinessConstraintsException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", exception.getMessage()));
     }
 }
