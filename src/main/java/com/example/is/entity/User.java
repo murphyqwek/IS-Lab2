@@ -19,7 +19,7 @@ public class User {
             length = 50,
             check = @CheckConstraint(
                     name = "check_user_name_fit_size",
-                    constraint = "char_length(trim(username)) > 0"))
+                    constraint = "char_length(trim(username)) > 3"))
     private String username;
 
     @NotBlank

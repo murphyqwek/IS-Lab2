@@ -1,4 +1,14 @@
 package com.example.is.dto.request;
 
-public record LoginRequest(String username, String password) {
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+
+public record LoginRequest(
+        @NotBlank
+        @Min(4) @Max(50)
+        String username,
+        @NotBlank
+        @Min(8) @Max(25)
+        String password) {
 }
