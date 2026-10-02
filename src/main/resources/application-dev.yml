@@ -9,6 +9,9 @@ spring:
     multipart:
       max-file-size: 1MB
       max-request-size: 2MB
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
   datasource:
     url: jdbc:postgresql://localhost:5433/studs
     username: myuser
