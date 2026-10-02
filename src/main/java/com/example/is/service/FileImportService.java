@@ -66,12 +66,20 @@ public class FileImportService {
     }
 
     private int getImportedObjectsCount(ImportFileDTO objects) {
-        return objects.getCoordinates().size()
-                + objects.getEvents().size()
-                + objects.getPersons().size()
-                + objects.getVenues().size()
-                + objects.getLocations().size()
-                + objects.getTickets().size();
+        if (objects == null) {
+            return 0;
+        }
+
+        return sizeOrZero(objects.getCoordinates())
+                + sizeOrZero(objects.getEvents())
+                + sizeOrZero(objects.getPersons())
+                + sizeOrZero(objects.getVenues())
+                + sizeOrZero(objects.getLocations())
+                + sizeOrZero(objects.getTickets());
+    }
+
+    private int sizeOrZero(List<?> collection) {
+        return collection == null ? 0 : collection.size();
     }
 
     @Transactional

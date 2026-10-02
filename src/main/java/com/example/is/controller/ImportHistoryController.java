@@ -30,7 +30,7 @@ public class ImportHistoryController {
     public CursorPage<ImportHistoryResponse> getHistory(
             @RequestParam(required = false) Instant cursorCreatedAt,
             @RequestParam(required = false) Long cursorId,
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "5") int size,
             Authentication authentication
     ) {
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();

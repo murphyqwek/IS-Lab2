@@ -5,8 +5,6 @@ export type EventType = 'CONCERT' | 'BASKETBALL' | 'OPERA' | 'EXPOSITION';
 export type VenueType = 'BAR' | 'LOFT' | 'CINEMA';
 export type SortDirection = 'ASC' | 'DESC';
 
-// Названия соответствуют предполагаемому TicketSortField на backend.
-// Если enum в Java назван иначе, поправь только этот union и options в tickets-page.ts.
 export type TicketSortField = 'NAME' | 'EVENT_NAME' | 'EVENT_DESCRIPTION' | 'VENUE_NAME';
 
 export interface CoordinatesResponse {

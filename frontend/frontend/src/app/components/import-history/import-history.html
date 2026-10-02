@@ -1,0 +1,19 @@
+<aside id="import-history" aria-labelledby="history-title">
+  <div class="heading"><h2 id="history-title">История импорта</h2><button type="button" (click)="imports.historyOpen.set(false)" aria-label="Скрыть историю">✕</button></div>
+  <div class="toolbar"><span>Последние загрузки</span><button type="button" (click)="reset()" [disabled]="loading()">Обновить</button></div>
+  <div #scrollArea class="history-scroll" (scroll)="checkViewport()" [attr.aria-busy]="loading()" tabindex="0" aria-label="Список загрузок">
+    @for (row of rows(); track row.id) {
+      <article>
+        <div class="row"><strong>Импорт #{{ row.id }}</strong><span class="status" [class.success]="row.status === 'SUCCESS'" [class.failed]="row.status === 'FAILED'">{{ status(row.status) }}</span></div>
+        <p class="username" [title]="row.username">{{ row.username }}</p>
+        <time [attr.datetime]="row.createdAt">{{ row.createdAt | date:'dd.MM.yyyy, HH:mm:ss' }}</time>
+        <p class="count">Объектов: <strong>{{ row.importedObjectsCount }}</strong></p>
+      </article>
+    }
+    @if (error()) { <div class="error" role="alert">{{ error() }}</div>@if (hasNext()) { <button type="button" (click)="load(true)">Повторить</button> } }
+    @if (loading()) { <p class="hint" role="status">Загрузка…</p> }
+    @if (!loading() && !error() && rows().length === 0) { <p class="hint">Загрузок пока нет</p> }
+    @if (!hasNext() && rows().length && !error()) { <p class="hint">Все загрузки показаны</p> }
+    <div #sentinel class="sentinel" aria-hidden="true"></div>
+  </div>
+</aside>

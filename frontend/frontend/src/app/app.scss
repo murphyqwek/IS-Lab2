@@ -1,22 +1,8 @@
-:host {
-  display: block;
-  min-height: 100vh;
-  font-family: Verdana, Geneva, Tahoma, sans-serif;
-}
-
-.app-shell {
-  min-height: 100vh;
-  background: #fff;
-}
-
-.page-content {
-  padding-top: 72px;
-  min-height: calc(100vh - 72px);
-}
-
-@media (max-width: 806px) {
-  .page-content {
-    padding-top: 112px;
-    min-height: calc(100vh - 112px);
-  }
-}
+:host { display: block; min-height: 100vh; }
+.app-shell { min-height: 100vh; background: #fff; }
+.page-content { padding-top: 72px; min-height: calc(100vh - 72px); }
+.with-history { margin-right: 340px; }
+.notification { position: fixed; z-index: 2000; bottom: 24px; left: 24px; width: 420px; max-width: calc(100vw - 48px); max-height: 60vh; overflow: auto; box-sizing: border-box; display: flex; align-items: flex-start; gap: 16px; padding: 18px; border: 1px solid #86efac; border-radius: 12px; background: #f0fdf4; color: #166534; box-shadow: 0 12px 35px #0003; }
+.notification.error { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
+.notification div { flex: 1; min-width: 0; }.notification p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.5; margin: 8px 0 0; }.notification button { background: transparent; border: 0; color: inherit; cursor: pointer; font-size: 18px; }
+@media(max-width: 1000px) { .page-content { padding-top: 112px; } .with-history { margin-right: 0; } }

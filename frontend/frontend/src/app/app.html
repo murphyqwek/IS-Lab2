@@ -1,6 +1,11 @@
 <div class="app-shell">
   <app-header />
-  <main class="page-content">
-    <router-outlet />
-  </main>
+  <main class="page-content" [class.with-history]="imports.historyOpen()"><router-outlet /></main>
+  @if (imports.historyOpen()) { <app-import-history /> }
+  @if (imports.notice(); as notice) {
+    <div class="notification" [class.error]="notice.error" [attr.role]="notice.error ? 'alert' : 'status'">
+      <div><strong>{{ notice.error ? 'Ошибка' : 'Импорт' }}</strong><p>{{ notice.text }}</p></div>
+      <button type="button" (click)="imports.notice.set(null)" aria-label="Закрыть уведомление">✕</button>
+    </div>
+  }
 </div>

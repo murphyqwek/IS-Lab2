@@ -29,8 +29,10 @@ export class RealtimeService {
     this.client.onWebSocketClose = () => this.connected.set(false);
     this.client.onStompError = () => this.connected.set(false);
 
-    this.client.activate();
   }
+
+  connect(): void { if (!this.client.active) this.client.activate(); }
+  disconnect(): void { void this.client.deactivate(); this.connected.set(false); }
 
   subscribe(listener: (event: EntityChangedEvent) => void): () => void {
     this.listeners.add(listener);

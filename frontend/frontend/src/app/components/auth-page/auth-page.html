@@ -1,0 +1,37 @@
+<div class="auth-background">
+  <section class="auth-card" aria-labelledby="auth-title">
+    <h1 id="auth-title">{{ registration ? 'Регистрация' : 'Авторизация' }}</h1>
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <div class="field">
+        <label for="username">Логин</label>
+        <input id="username" formControlName="username" autocomplete="username" placeholder="Введите логин"
+          [class.invalid]="fieldError('username')" [attr.aria-invalid]="!!fieldError('username')"
+          aria-describedby="username-error" (input)="clearError('username')" />
+        @if (registration) { <small>От 4 до 50 символов</small> }
+        <p id="username-error" class="field-error">{{ fieldError('username') }}</p>
+      </div>
+      <div class="field">
+        <label for="password">Пароль</label>
+        <input id="password" type="password" formControlName="password" [attr.autocomplete]="registration ? 'new-password' : 'current-password'"
+          placeholder="Введите пароль" [class.invalid]="fieldError('password')" [attr.aria-invalid]="!!fieldError('password')"
+          aria-describedby="password-error" (input)="clearError('password')" />
+        @if (registration) { <small>От 8 до 25 символов</small> }
+        <p id="password-error" class="field-error">{{ fieldError('password') }}</p>
+      </div>
+      @if (registration) {
+        <div class="field">
+          <label for="confirmPassword">Повторите пароль</label>
+          <input id="confirmPassword" type="password" formControlName="confirmPassword" autocomplete="new-password"
+            placeholder="Повторите пароль" [class.invalid]="fieldError('confirmPassword')"
+            [attr.aria-invalid]="!!fieldError('confirmPassword')" aria-describedby="confirm-error" (input)="clearError('confirmPassword')" />
+          <p id="confirm-error" class="field-error">{{ fieldError('confirmPassword') }}</p>
+        </div>
+      }
+      @if (message()) { <div class="form-error" role="alert">{{ message() }}</div> }
+      <button type="submit" [disabled]="busy()">{{ busy() ? 'Подождите…' : (registration ? 'Зарегистрироваться' : 'Войти') }}</button>
+      <p class="switch">{{ registration ? 'Уже есть аккаунт?' : 'Нет аккаунта?' }}
+        <a [routerLink]="registration ? '/login' : '/register'" queryParamsHandling="preserve">{{ registration ? 'Войти' : 'Зарегистрироваться' }}</a>
+      </p>
+    </form>
+  </section>
+</div>

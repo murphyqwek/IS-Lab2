@@ -1,12 +1,28 @@
 <header>
-  <nav>
+  @if (auth.user(); as user) {
+  <nav aria-label="Главное меню">
     <a routerLink="/tickets" routerLinkActive="active">Билеты</a>
     <a routerLink="/references" routerLinkActive="active">Справочники</a>
     <a routerLink="/operations" routerLinkActive="active">Спец. операции</a>
   </nav>
-
-  <div class="socket-state" [class.online]="realtime.connected()">
-    <span class="dot"></span>
-    {{ realtime.connected() ? 'online' : 'offline' }}
+  <div class="actions">
+    <input #fileInput type="file" accept=".json,application/json" hidden (change)="chooseFile($event)" />
+    <button type="button" (click)="fileInput.click()" [disabled]="uploading()">{{ uploading() ? 'Импорт…' : 'Импорт JSON' }}</button>
+    <button type="button" (click)="imports.historyOpen.set(!imports.historyOpen())" [attr.aria-expanded]="imports.historyOpen()" aria-controls="import-history">История</button>
+      <div class="user-menu">
+        <button class="user-button" type="button" [title]="user.username" (click)="menuOpen.set(!menuOpen())" [attr.aria-expanded]="menuOpen()" aria-controls="user-dropdown"><span>{{ user.username }}</span><span aria-hidden="true">▾</span></button>
+        @if (menuOpen()) {
+          <div id="user-dropdown" class="dropdown">
+            <p>{{ user.username }}</p>
+            <button type="button" (click)="logout()" [disabled]="loggingOut()">{{ loggingOut() ? 'Выход…' : 'Выйти' }}</button>
+          </div>
+        }
+      </div>
   </div>
+  } @else {
+    <nav aria-label="Вход и регистрация">
+      <a routerLink="/login" routerLinkActive="active">Авторизация</a>
+      <a routerLink="/register" routerLinkActive="active">Регистрация</a>
+    </nav>
+  }
 </header>
