@@ -14,6 +14,7 @@ import com.example.is.websocket.ChangeType;
 import com.example.is.websocket.EntityChangePublisher;
 import com.example.is.websocket.EntityType;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -68,7 +69,7 @@ public class LocationService {
         return createEntity(request.newObject());
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public LocationResponse update(Long id, LocationRequest request) {
         Location location = find(id);
 

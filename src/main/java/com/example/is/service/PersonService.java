@@ -14,6 +14,7 @@ import com.example.is.websocket.ChangeType;
 import com.example.is.websocket.EntityChangePublisher;
 import com.example.is.websocket.EntityType;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -71,7 +72,7 @@ public class PersonService {
         return createEntity(request.newObject());
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public PersonResponse update(Long id, PersonRequest request) {
         Person person = find(id);
 

@@ -15,6 +15,7 @@ import com.example.is.websocket.ChangeType;
 import com.example.is.websocket.EntityChangePublisher;
 import com.example.is.websocket.EntityType;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -69,7 +70,7 @@ public class EventService {
         return createEntity(request.newObject());
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public EventResponse update(Integer id, EventRequest request) {
         if(isEventNameTakenByAnotherEvent(request.name(), id)) {
             throw new BusinessConstraintsException("Event с названием " + request.name() + " уже есть. Выберите другое название");

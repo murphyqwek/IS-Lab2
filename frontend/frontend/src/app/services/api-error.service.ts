@@ -9,7 +9,7 @@ export class ApiErrorService {
     }
 
     if (error.status === 0) {
-      return 'Сервер недоступен. Проверь, что Spring-приложение запущено и CORS настроен.';
+      return 'Сервер недоступен';
     }
 
     const body = error.error;

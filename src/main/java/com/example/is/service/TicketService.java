@@ -20,6 +20,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -35,6 +36,8 @@ public class TicketService {
     private final TicketMapper ticketMapper;
     private final VenueMapper venueMapper;
     private final EntityChangePublisher changePublisher;
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TicketService.class);
 
     public TicketService(
             TicketRepository ticketRepository,
@@ -141,9 +144,19 @@ public class TicketService {
         return ticketMapper.toResponse(savedTicket);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public TicketResponse update(Integer id, TicketRequest request) {
         Ticket ticket = find(id);
+
+        log.info(
+                "UPDATE READ: thread={}, id={}, oldName={}, requestedName={} oldPrice={}, requestedPrice={}",
+                Thread.currentThread().getName(),
+                id,
+                ticket.getName(),
+                request.name(),
+                ticket.getPrice(),
+                request.price()
+        );
 
         applyRequest(ticket, request);
 

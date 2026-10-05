@@ -18,7 +18,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/tickets")
 public class TicketController {
-
     private final TicketService ticketService;
 
     public TicketController(TicketService ticketService) {
