@@ -1,0 +1,2328 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="ИС ЛР2 — конкурентные транзакции" enabled="true">
+      <boolProp name="TestPlan.serialize_threadgroups">true</boolProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.tearDown_on_shutdown">true</boolProp>
+      <stringProp name="TestPlan.comments">НАСТРОЙКА
+1. Заполните «00 — Настройки»: адрес, существующие учётные записи (2 разных пользователя), реальные JSON DTO и ID тестовых Ticket.
+2. Пути API ниже — предположения. Исправьте их под свои контроллеры. ID в ответе создания ожидается в поле id.
+3. JSON задаётся прямо здесь: никаких CSV или файлов импорта рядом с JMX не требуется. Для multipart создаётся временный файл.
+4. Отключайте целые группы 01–07: правой кнопкой → Disable. Служебную группу 00 оставляйте включённой.
+5. Группы идут последовательно, пользователи внутри каждой — параллельно. Один цикл. Для повторения восстановите удалённые Ticket, задайте исходное состояние редактируемых объектов.
+6. Не меняйте число потоков в 01 (4), 02/03/04 (2). В остальных можно увеличить: пользователи A/B чередуются.
+
+ШАБЛОНЫ
+ticket_create_json / ticket_update_json: полный валидный DTO, существующие ссылки на вспомогательные объекты. name перезаписывается меткой теста.
+event_json / venue_json: полный валидный DTO; name перезаписывается общей меткой.
+import_json: полный валидный файл. Используйте @EVENT@ и @VENUE@ в именах создаваемых объектов. Включите оба маркера. Для проверки отката добавьте другие объекты, создаваемые до конфликтного Event/Venue.
+users_json: две учётные записи с правами на тестовые объекты. Пароли сохраняются в JMX открытым текстом.
+conflict_codes: реальные коды бизнес-конфликтов (по умолчанию 409). Не добавляйте 400, пока не убедитесь, что это именно бизнес-конфликт, а не невалидный DTO.
+
+ИНТЕРПРЕТАЦИЯ
+01: все четыре операции должны завершиться 2xx. Проверяйте GET и импортированные строки.
+02: записываются разные имена. Два 2xx сами по себе не доказывают lost update: транзакции могли исполниться последовательно. Для доказательства нужен журнал чтений/записей или контроль версий. @Version без клиентской версии не защищает от устаревшей формы между HTTP-запросами.
+03: допустимы UPDATE → DELETE (оба успешны), либо конфликт одной операции. Если DELETE успешен, итоговый GET должен быть 404.
+04: две успешные DELETE допустимы при идемпотентном контракте API. Итоговый GET должен быть 404.
+05/06/07: автоматически требуется ровно один 2xx, остальные — коды conflict_codes. Это проверка ответов, не доказательство уникальности в БД.
+
+ОБЯЗАТЕЛЬНО ПОСЛЕ 05/06/07
+В View Results Tree → «Итог ответов» найдите метки. Выполните SELECT count(*) FROM event WHERE name=&apos;&lt;метка&gt;&apos;; аналогично venue. Ожидается ровно 1.
+После 07 проверьте отсутствие частично импортированных объектов, историю импорта (1 SUCCESS, остальные FAILED) и прирост количества всех сущностей согласно ровно одному файлу.
+Для 01 импорт должен иметь все строки; DELETE Ticket должен отсутствовать; UPDATE должен содержать отправленные данные.
+Для сравнения изоляции повторите тест до/после изменения, сохраняя JTL и состояние БД. Барьер сближает HTTP-запросы, но не гарантирует пересечение транзакций: повторяйте эксперимент.
+При SERIALIZABLE проверьте уровень внешней транзакции импорта: вложенный REQUIRED обычно присоединяется к ней.
+Не считайте 500 ожидаемым бизнес-конфликтом: сохраните ответ и исследуйте обработку ошибки.
+План проверен как XML; запуск на вашем API не выполнялся.</stringProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" enabled="true">
+        <collectionProp name="Arguments.arguments"/>
+      </elementProp>
+    </TestPlan>
+    <hashTree>
+      <Arguments guiclass="ArgumentsPanel" testclass="Arguments" testname="Настройки">
+        <collectionProp name="Arguments.arguments">
+          <elementProp name="protocol" elementType="Argument">
+            <stringProp name="Argument.name">protocol</stringProp>
+            <stringProp name="Argument.value">http</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="host" elementType="Argument">
+            <stringProp name="Argument.name">host</stringProp>
+            <stringProp name="Argument.value">localhost</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="port" elementType="Argument">
+            <stringProp name="Argument.name">port</stringProp>
+            <stringProp name="Argument.value">2721</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="login_path" elementType="Argument">
+            <stringProp name="Argument.name">login_path</stringProp>
+            <stringProp name="Argument.value">/api/auth/login</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="tickets_path" elementType="Argument">
+            <stringProp name="Argument.name">tickets_path</stringProp>
+            <stringProp name="Argument.value">/api/tickets</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="events_path" elementType="Argument">
+            <stringProp name="Argument.name">events_path</stringProp>
+            <stringProp name="Argument.value">/api/events</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="venues_path" elementType="Argument">
+            <stringProp name="Argument.name">venues_path</stringProp>
+            <stringProp name="Argument.value">/api/venues</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="import_path" elementType="Argument">
+            <stringProp name="Argument.name">import_path</stringProp>
+            <stringProp name="Argument.value">/api/import</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="import_part" elementType="Argument">
+            <stringProp name="Argument.name">import_part</stringProp>
+            <stringProp name="Argument.value">file</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="update_method" elementType="Argument">
+            <stringProp name="Argument.name">update_method</stringProp>
+            <stringProp name="Argument.value">PUT</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="users_json" elementType="Argument">
+            <stringProp name="Argument.name">users_json</stringProp>
+            <stringProp name="Argument.value">[{&quot;username&quot;:&quot;user1&quot;,&quot;password&quot;:&quot;password&quot;},{&quot;username&quot;:&quot;user2&quot;,&quot;password&quot;:&quot;password&quot;}]</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="ticket_create_json" elementType="Argument">
+            <stringProp name="Argument.name">ticket_create_json</stringProp>
+            <stringProp name="Argument.value">{&quot;name&quot;:&quot;TestTicket&quot;,&quot;coordinates&quot;:{&quot;id&quot;:1,&quot;newObject&quot;:null},&quot;person&quot;:{&quot;id&quot;:1,&quot;newObject&quot;:null},&quot;event&quot;:{&quot;id&quot;:1,&quot;newObject&quot;:null},&quot;price&quot;:12,&quot;ticketType&quot;:&quot;USUAL&quot;,&quot;discount&quot;:12,&quot;number&quot;:12,&quot;venue&quot;:{&quot;id&quot;:1,&quot;newObject&quot;:null}}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="ticket_update_json" elementType="Argument">
+            <stringProp name="Argument.name">ticket_update_json</stringProp>
+            <stringProp name="Argument.value">{&quot;name&quot;:&quot;Original&quot;,&quot;coordinates&quot;:{&quot;id&quot;:1,&quot;newObject&quot;:null},&quot;person&quot;:{&quot;id&quot;:1,&quot;newObject&quot;:null},&quot;event&quot;:{&quot;id&quot;:1,&quot;newObject&quot;:null},&quot;price&quot;:100,&quot;ticketType&quot;:&quot;BUDGETARY&quot;,&quot;discount&quot;:13,&quot;number&quot;:13,&quot;venue&quot;:{&quot;id&quot;:1,&quot;newObject&quot;:null}}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="event_json" elementType="Argument">
+            <stringProp name="Argument.name">event_json</stringProp>
+            <stringProp name="Argument.value">{&quot;name&quot;:&quot;@EVENT@&quot;,&quot;description&quot;:&quot;Bla bla bla&quot;,&quot;eventType&quot;:&quot;BASKETBALL&quot;}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="venue_json" elementType="Argument">
+            <stringProp name="Argument.name">venue_json</stringProp>
+            <stringProp name="Argument.value">{&quot;name&quot;:&quot;@VENUE@&quot;,&quot;capacity&quot;:12,&quot;venueType&quot;:&quot;BAR&quot;}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="import_json" elementType="Argument">
+            <stringProp name="Argument.name">import_json</stringProp>
+            <stringProp name="Argument.value">{   &quot;coordinates&quot;: [     {&quot;x&quot;: 7123, &quot;y&quot;: 7456}   ],   &quot;events&quot;: [     {       &quot;name&quot;: &quot;@EVENT@&quot;,       &quot;description&quot;: &quot;Concurrent import test&quot;,       &quot;eventType&quot;: &quot;BASKETBALL&quot;     }   ],   &quot;venues&quot;: [     {       &quot;name&quot;: &quot;@VENUE@&quot;,       &quot;capacity&quot;: 12,       &quot;venueType&quot;: &quot;BAR&quot;     }   ] }</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="crud_update_id" elementType="Argument">
+            <stringProp name="Argument.name">crud_update_id</stringProp>
+            <stringProp name="Argument.value">1</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="crud_delete_id" elementType="Argument">
+            <stringProp name="Argument.name">crud_delete_id</stringProp>
+            <stringProp name="Argument.value">2</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="update_same_id" elementType="Argument">
+            <stringProp name="Argument.name">update_same_id</stringProp>
+            <stringProp name="Argument.value">3</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="update_delete_id" elementType="Argument">
+            <stringProp name="Argument.name">update_delete_id</stringProp>
+            <stringProp name="Argument.value">4</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="delete_same_id" elementType="Argument">
+            <stringProp name="Argument.name">delete_same_id</stringProp>
+            <stringProp name="Argument.value">7</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="conflict_codes" elementType="Argument">
+            <stringProp name="Argument.name">conflict_codes</stringProp>
+            <stringProp name="Argument.value">409</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="event_update_id_1" elementType="Argument">
+            <stringProp name="Argument.name">event_update_id_1</stringProp>
+            <stringProp name="Argument.value">1</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="event_update_id_2" elementType="Argument">
+            <stringProp name="Argument.name">event_update_id_2</stringProp>
+            <stringProp name="Argument.value">2</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="event_update_method" elementType="Argument">
+            <stringProp name="Argument.name">event_update_method</stringProp>
+            <stringProp name="Argument.value">PUT</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="event_update_json" elementType="Argument">
+            <stringProp name="Argument.name">event_update_json</stringProp>
+            <stringProp name="Argument.value"></stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+        </collectionProp>
+      </Arguments>
+      <hashTree/>
+      <SetupThreadGroup guiclass="SetupThreadGroupGui" testclass="SetupThreadGroup" testname="Служебная инициализация" enabled="true">
+        <intProp name="ThreadGroup.num_threads">1</intProp>
+        <intProp name="ThreadGroup.ramp_time">0</intProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController">
+          <stringProp name="LoopController.loops">1</stringProp>
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+        </elementProp>
+      </SetupThreadGroup>
+      <hashTree>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="Новый идентификатор запуска" enabled="true">
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="script">def run = UUID.randomUUID().toString().substring(0,8)
+props.put(&apos;is_lab_run&apos;,run)
+(1..8).each { props.put(&apos;is_lab_results_&apos;+it, new java.util.concurrent.ConcurrentHashMap()) }
+SampleResult.setResponseData(&apos;Run: &apos;+run,&apos;UTF-8&apos;)
+SampleResult.setSuccessful(true)
+</stringProp>
+        </JSR223Sampler>
+        <hashTree/>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="1 Параллельный Crud и Import" enabled="false">
+        <intProp name="ThreadGroup.num_threads">4</intProp>
+        <intProp name="ThreadGroup.ramp_time">0</intProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController">
+          <stringProp name="LoopController.loops">1</stringProp>
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+        </elementProp>
+      </ThreadGroup>
+      <hashTree>
+        <CookieManager guiclass="CookiePanel" testclass="CookieManager" testname="Отдельная сессия каждого потока" enabled="true">
+          <collectionProp name="CookieManager.cookies"/>
+          <boolProp name="CookieManager.clearEachIteration">true</boolProp>
+          <boolProp name="CookieManager.controlledByThreadGroup">false</boolProp>
+        </CookieManager>
+        <hashTree/>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="Подготовка и проверка настроек" enabled="true">
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="script">import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+int scenario = 1
+ 
+try {
+ int index = ctx.getThreadNum()
+ String run = props.get(&apos;is_lab_run&apos;)
+ assert run : &apos;Включите служебную группу 00&apos;
+ def parse = { String key -&gt;
+   def data = new JsonSlurper().parseText(vars.get(key))
+   assert data instanceof Map &amp;&amp; !data.isEmpty() : &apos;Заполните &apos;+key+&apos; валидным JSON DTO&apos;
+   data
+ }
+ def users = new JsonSlurper().parseText(vars.get(&apos;users_json&apos;))
+ assert users.size() &gt;= 2 &amp;&amp; users[0].username != users[1].username : &apos;Нужны два разных пользователя&apos;
+ assert !vars.get(&apos;users_json&apos;).contains(&apos;FILL_&apos;) : &apos;Заполните users_json&apos;
+ vars.put(&apos;login_body&apos;,JsonOutput.toJson(users[index % users.size()]))
+ vars.put(&apos;scenario&apos;,scenario.toString())
+ vars.put(&apos;test_name&apos;,&apos;JM_&apos;+run+&apos;_S&apos;+scenario)
+ String operation = scenario == 1 ? [&apos;create&apos;,&apos;update&apos;,&apos;delete&apos;,&apos;import&apos;][index] :
+   scenario == 2 ? &apos;update&apos; : scenario == 3 ? (index == 0 ? &apos;update&apos; : &apos;delete&apos;) :
+   scenario == 4 ? &apos;delete&apos; : scenario == 5 ? &apos;event&apos; : scenario == 6 ? &apos;venue&apos; : &apos;import&apos;
+ vars.put(&apos;operation&apos;,operation)
+ String idKey = scenario == 1 ? (operation == &apos;update&apos; ? &apos;crud_update_id&apos; : &apos;crud_delete_id&apos;) :
+   scenario == 2 ? &apos;update_same_id&apos; : scenario == 3 ? &apos;update_delete_id&apos; : &apos;delete_same_id&apos;
+ String id = vars.get(idKey)
+ if (operation in [&apos;update&apos;,&apos;delete&apos;]) assert id?.isInteger() &amp;&amp; id.toInteger()&gt;0 : &apos;Заполните &apos;+idKey
+ vars.put(&apos;target_id&apos;,id ?: &apos;&apos;)
+ String path = vars.get(&apos;tickets_path&apos;)
+ String method = &apos;POST&apos;
+ def body = null
+ switch(operation) {
+ case &apos;create&apos;: body=parse(&apos;ticket_create_json&apos;); body.name=vars.get(&apos;test_name&apos;)+&apos;_CREATE&apos;; break
+ case &apos;update&apos;: path+=&apos;/&apos;+id; method=vars.get(&apos;update_method&apos;); body=parse(&apos;ticket_update_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_USER&apos;+(index+1);break
+ case &apos;delete&apos;: path+=&apos;/&apos;+id;method=&apos;DELETE&apos;;break
+ case &apos;event&apos;:path=vars.get(&apos;events_path&apos;);body=parse(&apos;event_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_EVENT&apos;;break
+ case &apos;venue&apos;:path=vars.get(&apos;venues_path&apos;);body=parse(&apos;venue_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_VENUE&apos;;break
+ case &apos;import&apos;:
+   path=vars.get(&apos;import_path&apos;)
+   String raw=vars.get(&apos;import_json&apos;)
+   parse(&apos;import_json&apos;)
+   assert raw.contains(&apos;@EVENT@&apos;) &amp;&amp; raw.contains(&apos;@VENUE@&apos;) : &apos;Добавьте @EVENT@ и @VENUE@ в имена объектов import_json&apos;
+   raw=raw.replace(&apos;@EVENT@&apos;,vars.get(&apos;test_name&apos;)+&apos;_EVENT&apos;).replace(&apos;@VENUE@&apos;,vars.get(&apos;test_name&apos;)+&apos;_VENUE&apos;)
+   def file=File.createTempFile(&apos;is-lab-import-&apos;,&apos;.json&apos;);file.setText(raw,&apos;UTF-8&apos;);file.deleteOnExit()
+   vars.put(&apos;import_file&apos;,file.absolutePath)
+   break
+ }
+ vars.put(&apos;action_path&apos;,path);vars.put(&apos;action_method&apos;,method)
+ vars.put(&apos;action_body&apos;,body == null ? &apos;&apos; : JsonOutput.toJson(body))
+ SampleResult.setSuccessful(true)
+ SampleResult.setResponseData(&apos;Scenario &apos;+scenario+&apos; / &apos;+operation+&apos; / &apos;+vars.get(&apos;test_name&apos;),&apos;UTF-8&apos;)
+} catch (Throwable ex) {
+ SampleResult.setSuccessful(false);SampleResult.setResponseCode(&apos;CONFIG_ERROR&apos;)
+ SampleResult.setResponseMessage(ex.message);SampleResult.setStopThread(true)
+}
+</stringProp>
+        </JSR223Sampler>
+        <hashTree/>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Login" enabled="true">
+          <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+          <intProp name="HTTPSampler.response_timeout">30000</intProp>
+          <stringProp name="HTTPSampler.domain">${host}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">${login_path}</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">${login_body}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+          <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="JSON Content-Type" enabled="true">
+            <collectionProp name="HeaderManager.headers">
+              <elementProp name="" elementType="Header">
+                <stringProp name="Header.name">Content-Type</stringProp>
+                <stringProp name="Header.value">application/json</stringProp>
+              </elementProp>
+            </collectionProp>
+          </HeaderManager>
+          <hashTree/>
+          <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Не продолжать при ошибке входа" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">if (!(prev.responseCode ==~ /2\d\d/)) {
+ prev.setSuccessful(false);prev.setStopThread(true)
+}
+</stringProp>
+          </JSR223PostProcessor>
+          <hashTree/>
+        </hashTree>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Конкурентная операция" enabled="true">
+          <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+          <intProp name="HTTPSampler.response_timeout">30000</intProp>
+          <stringProp name="HTTPSampler.domain">${host}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">${action_path}</stringProp>
+          <stringProp name="HTTPSampler.method">${action_method}</stringProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+            <collectionProp name="Arguments.arguments"/>
+          </elementProp>
+          <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="JSON или multipart из встроенного шаблона" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">
+import org.apache.jmeter.protocol.http.control.HeaderManager
+import org.apache.jmeter.protocol.http.control.Header
+import org.apache.jmeter.protocol.http.util.HTTPFileArg
+def headers=new HeaderManager()
+headers.add(new Header(&apos;Accept&apos;,&apos;application/json&apos;))
+sampler.getArguments().removeAllArguments()
+sampler.setHTTPFiles(new HTTPFileArg[0])
+sampler.setDoMultipartPost(false);sampler.setPostBodyRaw(false)
+if(vars.get(&apos;operation&apos;)==&apos;import&apos;) {
+ sampler.setDoMultipartPost(true)
+ sampler.setHTTPFiles([new HTTPFileArg(vars.get(&apos;import_file&apos;),vars.get(&apos;import_part&apos;),&apos;application/json&apos;)] as HTTPFileArg[])
+} else if(vars.get(&apos;action_body&apos;)) {
+ headers.add(new Header(&apos;Content-Type&apos;,&apos;application/json&apos;))
+ sampler.addNonEncodedArgument(&apos;&apos;,vars.get(&apos;action_body&apos;),&apos;&apos;)
+ sampler.setPostBodyRaw(true)
+}
+sampler.setHeaderManager(headers)
+</stringProp>
+          </JSR223PreProcessor>
+          <hashTree/>
+          <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Старт" enabled="true">
+            <intProp name="groupSize">0</intProp>
+            <longProp name="timeoutInMs">30000</longProp>
+          </SyncTimer>
+          <hashTree/>
+          <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Сохранение итогов" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">
+def code=prev.responseCode
+boolean ok=code ==~ /2\d\d/
+def allowed=vars.get(&apos;conflict_codes&apos;).split(&apos;,&apos;).collect {it.trim()}
+int s=vars.get(&apos;scenario&apos;).toInteger()
+boolean expected=ok || (s!=1 &amp;&amp; (allowed.contains(code) || (s in [3,4] &amp;&amp; code==&apos;404&apos;)))
+prev.setSuccessful(expected)
+props.get(&apos;is_lab_results_&apos;+s).put(ctx.getThreadNum(),[code:code,ok:ok,expected:expected,operation:vars.get(&apos;operation&apos;)])
+if(ok &amp;&amp; vars.get(&apos;operation&apos;)==&apos;create&apos;) {
+ try { vars.put(&apos;target_id&apos;,new groovy.json.JsonSlurper().parseText(prev.responseDataAsString).id.toString()) }
+ catch(Exception ignored) { log.warn(&apos;Не удалось извлечь id созданного Ticket: проверьте формат ответа&apos;) }
+}
+if(vars.get(&apos;import_file&apos;)) new File(vars.get(&apos;import_file&apos;)).delete()
+</stringProp>
+          </JSR223PostProcessor>
+          <hashTree/>
+        </hashTree>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="Итог " enabled="true">
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="script">
+int s=vars.get(&apos;scenario&apos;).toInteger()
+def results=props.get(&apos;is_lab_results_&apos;+s)
+int expected=ctx.getThreadGroup().getNumThreads()
+def all=results.values().toList()
+int success=all.count {it.ok}
+boolean passed=all.size()==expected &amp;&amp; all.every {it.expected}
+if(s in [5,6,7]) passed=passed &amp;&amp; success==1
+if(s in [2,3,4]) passed=passed &amp;&amp; success&gt;=1
+SampleResult.setSuccessful(passed)
+SampleResult.setResponseCode(passed ? &apos;200&apos; : &apos;ASSERTION_FAILED&apos;)
+SampleResult.setResponseData(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
+ scenario:s,marker:vars.get(&apos;test_name&apos;),responses:results,successCount:success,
+ note:&apos;Проверены HTTP-ответы. Уникальность и откат подтвердите в БД. Два успешных UPDATE не доказывают lost update.&apos;
+])), &apos;UTF-8&apos;)
+</stringProp>
+        </JSR223Sampler>
+        <hashTree>
+          <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Конец" enabled="true">
+            <intProp name="groupSize">0</intProp>
+            <longProp name="timeoutInMs">30000</longProp>
+          </SyncTimer>
+          <hashTree/>
+        </hashTree>
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="GET итогового Ticket" enabled="true">
+          <stringProp name="IfController.condition">${__groovy(vars.get(&apos;operation&apos;) != &apos;import&apos;)}</stringProp>
+          <boolProp name="IfController.evaluateAll">false</boolProp>
+          <boolProp name="IfController.useExpression">true</boolProp>
+        </IfController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET итогового состояния" enabled="true">
+            <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+            <intProp name="HTTPSampler.response_timeout">30000</intProp>
+            <stringProp name="HTTPSampler.domain">${host}</stringProp>
+            <stringProp name="HTTPSampler.port">${port}</stringProp>
+            <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+            <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+            <stringProp name="HTTPSampler.path">${tickets_path}/${target_id}</stringProp>
+            <stringProp name="HTTPSampler.method">GET</stringProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+              <collectionProp name="Arguments.arguments"/>
+            </elementProp>
+            <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <JSR223Assertion guiclass="TestBeanGUI" testclass="JSR223Assertion" testname="Проверить отсутствие после успешного DELETE" enabled="true">
+              <stringProp name="scriptLanguage">groovy</stringProp>
+              <stringProp name="cacheKey">true</stringProp>
+              <stringProp name="filename"></stringProp>
+              <stringProp name="parameters"></stringProp>
+              <stringProp name="script">
+int s=vars.get(&apos;scenario&apos;).toInteger()
+def results=props.get(&apos;is_lab_results_&apos;+s).values()
+boolean deleted=s==1 ? vars.get(&apos;operation&apos;)==&apos;delete&apos; &amp;&amp; results.any{it.operation==&apos;delete&apos; &amp;&amp; it.ok} : results.any{it.operation==&apos;delete&apos; &amp;&amp; it.ok}
+String expected=deleted ? &apos;404&apos; : &apos;200&apos;
+if(prev.responseCode!=expected) {
+ AssertionResult.setFailure(true);AssertionResult.setFailureMessage(&apos;Ожидался GET &apos;+expected+&apos;, получен &apos;+prev.responseCode)
+} else {
+ prev.setSuccessful(true)
+ if(!deleted &amp;&amp; s in [1,2]) {
+   try {
+    def data=new groovy.json.JsonSlurper().parseText(prev.responseDataAsString)
+    def prefix=vars.get(&apos;test_name&apos;)
+    def allowed=s==2 ? [prefix+&apos;_USER1&apos;,prefix+&apos;_USER2&apos;] : [new groovy.json.JsonSlurper().parseText(vars.get(&apos;action_body&apos;)).name]
+    if(!(data.name in allowed)) {AssertionResult.setFailure(true);AssertionResult.setFailureMessage(&apos;Итоговое name не соответствует отправленным данным&apos;)}
+   } catch(Exception ex) {AssertionResult.setFailure(true);AssertionResult.setFailureMessage(&apos;Не удалось прочитать name из GET: &apos;+ex.message)}
+ }
+}
+</stringProp>
+            </JSR223Assertion>
+            <hashTree/>
+          </hashTree>
+        </hashTree>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="2 Одновременное изменение одного Ticket" enabled="false">
+        <intProp name="ThreadGroup.num_threads">2</intProp>
+        <intProp name="ThreadGroup.ramp_time">0</intProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController">
+          <stringProp name="LoopController.loops">1</stringProp>
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+        </elementProp>
+      </ThreadGroup>
+      <hashTree>
+        <CookieManager guiclass="CookiePanel" testclass="CookieManager" testname="Отдельная сессия каждого потока" enabled="true">
+          <collectionProp name="CookieManager.cookies"/>
+          <boolProp name="CookieManager.clearEachIteration">true</boolProp>
+          <boolProp name="CookieManager.controlledByThreadGroup">false</boolProp>
+        </CookieManager>
+        <hashTree/>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="Подготовка и проверка настроек" enabled="true">
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="script">import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+int scenario = 2
+ 
+try {
+ int index = ctx.getThreadNum()
+ String run = props.get(&apos;is_lab_run&apos;)
+ assert run : &apos;Включите служебную группу 00&apos;
+ def parse = { String key -&gt;
+   def data = new JsonSlurper().parseText(vars.get(key))
+   assert data instanceof Map &amp;&amp; !data.isEmpty() : &apos;Заполните &apos;+key+&apos; валидным JSON DTO&apos;
+   data
+ }
+ def users = new JsonSlurper().parseText(vars.get(&apos;users_json&apos;))
+ assert users.size() &gt;= 2 &amp;&amp; users[0].username != users[1].username : &apos;Нужны два разных пользователя&apos;
+ assert !vars.get(&apos;users_json&apos;).contains(&apos;FILL_&apos;) : &apos;Заполните users_json&apos;
+ vars.put(&apos;login_body&apos;,JsonOutput.toJson(users[index % users.size()]))
+ vars.put(&apos;scenario&apos;,scenario.toString())
+ vars.put(&apos;test_name&apos;,&apos;JM_&apos;+run+&apos;_S&apos;+scenario)
+ String operation = scenario == 1 ? [&apos;create&apos;,&apos;update&apos;,&apos;delete&apos;,&apos;import&apos;][index] :
+   scenario == 2 ? &apos;update&apos; : scenario == 3 ? (index == 0 ? &apos;update&apos; : &apos;delete&apos;) :
+   scenario == 4 ? &apos;delete&apos; : scenario == 5 ? &apos;event&apos; : scenario == 6 ? &apos;venue&apos; : &apos;import&apos;
+ vars.put(&apos;operation&apos;,operation)
+ String idKey = scenario == 1 ? (operation == &apos;update&apos; ? &apos;crud_update_id&apos; : &apos;crud_delete_id&apos;) :
+   scenario == 2 ? &apos;update_same_id&apos; : scenario == 3 ? &apos;update_delete_id&apos; : &apos;delete_same_id&apos;
+ String id = vars.get(idKey)
+ if (operation in [&apos;update&apos;,&apos;delete&apos;]) assert id?.isInteger() &amp;&amp; id.toInteger()&gt;0 : &apos;Заполните &apos;+idKey
+ vars.put(&apos;target_id&apos;,id ?: &apos;&apos;)
+ String path = vars.get(&apos;tickets_path&apos;)
+ String method = &apos;POST&apos;
+ def body = null
+ switch(operation) {
+ case &apos;create&apos;: body=parse(&apos;ticket_create_json&apos;); body.name=vars.get(&apos;test_name&apos;)+&apos;_CREATE&apos;; break
+ case &apos;update&apos;: path+=&apos;/&apos;+id; method=vars.get(&apos;update_method&apos;); body=parse(&apos;ticket_update_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_USER&apos;+(index+1);break
+ case &apos;delete&apos;: path+=&apos;/&apos;+id;method=&apos;DELETE&apos;;break
+ case &apos;event&apos;:path=vars.get(&apos;events_path&apos;);body=parse(&apos;event_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_EVENT&apos;;break
+ case &apos;venue&apos;:path=vars.get(&apos;venues_path&apos;);body=parse(&apos;venue_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_VENUE&apos;;break
+ case &apos;import&apos;:
+   path=vars.get(&apos;import_path&apos;)
+   String raw=vars.get(&apos;import_json&apos;)
+   parse(&apos;import_json&apos;)
+   assert raw.contains(&apos;@EVENT@&apos;) &amp;&amp; raw.contains(&apos;@VENUE@&apos;) : &apos;Добавьте @EVENT@ и @VENUE@ в имена объектов import_json&apos;
+   raw=raw.replace(&apos;@EVENT@&apos;,vars.get(&apos;test_name&apos;)+&apos;_EVENT&apos;).replace(&apos;@VENUE@&apos;,vars.get(&apos;test_name&apos;)+&apos;_VENUE&apos;)
+   def file=File.createTempFile(&apos;is-lab-import-&apos;,&apos;.json&apos;);file.setText(raw,&apos;UTF-8&apos;);file.deleteOnExit()
+   vars.put(&apos;import_file&apos;,file.absolutePath)
+   break
+ }
+ vars.put(&apos;action_path&apos;,path);vars.put(&apos;action_method&apos;,method)
+ if(scenario == 2) {
+ 	if(index == 0) {
+ 		body.name = &apos;Not Original&apos;
+ 		body.price = 100
+ 	} else {
+ 		body.name = &apos;Original&apos;
+ 		body.price = 50
+ 	}
+ }
+ vars.put(&apos;action_body&apos;,body == null ? &apos;&apos; : JsonOutput.toJson(body))
+ SampleResult.setSuccessful(true)
+ SampleResult.setResponseData(&apos;Scenario &apos;+scenario+&apos; / &apos;+operation+&apos; / &apos;+vars.get(&apos;test_name&apos;),&apos;UTF-8&apos;)
+} catch (Throwable ex) {
+ SampleResult.setSuccessful(false);SampleResult.setResponseCode(&apos;CONFIG_ERROR&apos;)
+ SampleResult.setResponseMessage(ex.message);SampleResult.setStopThread(true)
+}
+</stringProp>
+        </JSR223Sampler>
+        <hashTree/>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Login" enabled="true">
+          <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+          <intProp name="HTTPSampler.response_timeout">30000</intProp>
+          <stringProp name="HTTPSampler.domain">${host}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">${login_path}</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">${login_body}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+          <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="JSON Content-Type" enabled="true">
+            <collectionProp name="HeaderManager.headers">
+              <elementProp name="" elementType="Header">
+                <stringProp name="Header.name">Content-Type</stringProp>
+                <stringProp name="Header.value">application/json</stringProp>
+              </elementProp>
+            </collectionProp>
+          </HeaderManager>
+          <hashTree/>
+          <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Не продолжать при ошибке входа" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">if (!(prev.responseCode ==~ /2\d\d/)) {
+ prev.setSuccessful(false);prev.setStopThread(true)
+}
+</stringProp>
+          </JSR223PostProcessor>
+          <hashTree/>
+        </hashTree>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Операция" enabled="true">
+          <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+          <intProp name="HTTPSampler.response_timeout">30000</intProp>
+          <stringProp name="HTTPSampler.domain">${host}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">${action_path}</stringProp>
+          <stringProp name="HTTPSampler.method">${action_method}</stringProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+            <collectionProp name="Arguments.arguments"/>
+          </elementProp>
+          <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="JSON или multipart из встроенного шаблона" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">
+import org.apache.jmeter.protocol.http.control.HeaderManager
+import org.apache.jmeter.protocol.http.control.Header
+import org.apache.jmeter.protocol.http.util.HTTPFileArg
+def headers=new HeaderManager()
+headers.add(new Header(&apos;Accept&apos;,&apos;application/json&apos;))
+sampler.getArguments().removeAllArguments()
+sampler.setHTTPFiles(new HTTPFileArg[0])
+sampler.setDoMultipartPost(false);sampler.setPostBodyRaw(false)
+if(vars.get(&apos;operation&apos;)==&apos;import&apos;) {
+ sampler.setDoMultipartPost(true)
+ sampler.setHTTPFiles([new HTTPFileArg(vars.get(&apos;import_file&apos;),vars.get(&apos;import_part&apos;),&apos;application/json&apos;)] as HTTPFileArg[])
+} else if(vars.get(&apos;action_body&apos;)) {
+ headers.add(new Header(&apos;Content-Type&apos;,&apos;application/json&apos;))
+ sampler.addNonEncodedArgument(&apos;&apos;,vars.get(&apos;action_body&apos;),&apos;&apos;)
+ sampler.setPostBodyRaw(true)
+}
+sampler.setHeaderManager(headers)
+</stringProp>
+          </JSR223PreProcessor>
+          <hashTree/>
+          <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Старт" enabled="true">
+            <intProp name="groupSize">0</intProp>
+            <longProp name="timeoutInMs">30000</longProp>
+          </SyncTimer>
+          <hashTree/>
+          <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Сохранить ответы для общего итога" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">
+def code=prev.responseCode
+boolean ok=code ==~ /2\d\d/
+def allowed=vars.get(&apos;conflict_codes&apos;).split(&apos;,&apos;).collect {it.trim()}
+int s=vars.get(&apos;scenario&apos;).toInteger()
+boolean expected=ok || (s!=1 &amp;&amp; (allowed.contains(code) || (s in [3,4] &amp;&amp; code==&apos;404&apos;)))
+prev.setSuccessful(expected)
+props.get(&apos;is_lab_results_&apos;+s).put(ctx.getThreadNum(),[code:code,ok:ok,expected:expected,operation:vars.get(&apos;operation&apos;)])
+if(ok &amp;&amp; vars.get(&apos;operation&apos;)==&apos;create&apos;) {
+ try { vars.put(&apos;target_id&apos;,new groovy.json.JsonSlurper().parseText(prev.responseDataAsString).id.toString()) }
+ catch(Exception ignored) { log.warn(&apos;Не удалось извлечь id созданного Ticket: проверьте формат ответа&apos;) }
+}
+if(vars.get(&apos;import_file&apos;)) new File(vars.get(&apos;import_file&apos;)).delete()
+</stringProp>
+          </JSR223PostProcessor>
+          <hashTree/>
+        </hashTree>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="Итог" enabled="true">
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="script">
+int s=vars.get(&apos;scenario&apos;).toInteger()
+def results=props.get(&apos;is_lab_results_&apos;+s)
+int expected=ctx.getThreadGroup().getNumThreads()
+def all=results.values().toList()
+int success=all.count {it.ok}
+boolean passed=all.size()==expected &amp;&amp; all.every {it.expected}
+if(s in [5,6,7]) passed=passed &amp;&amp; success==1
+if(s in [2,3,4]) passed=passed &amp;&amp; success&gt;=1
+SampleResult.setSuccessful(passed)
+SampleResult.setResponseCode(passed ? &apos;200&apos; : &apos;ASSERTION_FAILED&apos;)
+SampleResult.setResponseData(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
+ scenario:s,marker:vars.get(&apos;test_name&apos;),responses:results,successCount:success,
+ note:&apos;Проверены HTTP-ответы. Уникальность и откат подтвердите в БД. Два успешных UPDATE не доказывают lost update.&apos;
+])), &apos;UTF-8&apos;)
+</stringProp>
+        </JSR223Sampler>
+        <hashTree>
+          <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Конец" enabled="true">
+            <intProp name="groupSize">0</intProp>
+            <longProp name="timeoutInMs">30000</longProp>
+          </SyncTimer>
+          <hashTree/>
+        </hashTree>
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="GET итогового Ticket" enabled="true">
+          <stringProp name="IfController.condition">${__groovy(vars.get(&apos;operation&apos;) != &apos;import&apos;)}</stringProp>
+          <boolProp name="IfController.evaluateAll">false</boolProp>
+          <boolProp name="IfController.useExpression">true</boolProp>
+        </IfController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET — итоговое состояние" enabled="true">
+            <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+            <intProp name="HTTPSampler.response_timeout">30000</intProp>
+            <stringProp name="HTTPSampler.domain">${host}</stringProp>
+            <stringProp name="HTTPSampler.port">${port}</stringProp>
+            <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+            <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+            <stringProp name="HTTPSampler.path">${tickets_path}/${target_id}</stringProp>
+            <stringProp name="HTTPSampler.method">GET</stringProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+              <collectionProp name="Arguments.arguments"/>
+            </elementProp>
+            <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <JSR223Assertion guiclass="TestBeanGUI" testclass="JSR223Assertion" testname="Проверить отсутствие после успешного DELETE" enabled="false">
+              <stringProp name="scriptLanguage">groovy</stringProp>
+              <stringProp name="cacheKey">true</stringProp>
+              <stringProp name="filename"></stringProp>
+              <stringProp name="parameters"></stringProp>
+              <stringProp name="script">
+int s=vars.get(&apos;scenario&apos;).toInteger()
+def results=props.get(&apos;is_lab_results_&apos;+s).values()
+boolean deleted=s==1 ? vars.get(&apos;operation&apos;)==&apos;delete&apos; &amp;&amp; results.any{it.operation==&apos;delete&apos; &amp;&amp; it.ok} : results.any{it.operation==&apos;delete&apos; &amp;&amp; it.ok}
+String expected=deleted ? &apos;404&apos; : &apos;200&apos;
+if(prev.responseCode!=expected) {
+ AssertionResult.setFailure(true);AssertionResult.setFailureMessage(&apos;Ожидался GET &apos;+expected+&apos;, получен &apos;+prev.responseCode)
+} else {
+ prev.setSuccessful(true)
+ if(!deleted &amp;&amp; s in [1,2]) {
+   try {
+    def data=new groovy.json.JsonSlurper().parseText(prev.responseDataAsString)
+    def prefix=vars.get(&apos;test_name&apos;)
+    def allowed=s==2 ? [prefix+&apos;_USER1&apos;,prefix+&apos;_USER2&apos;] : [new groovy.json.JsonSlurper().parseText(vars.get(&apos;action_body&apos;)).name]
+    if(!(data.name in allowed)) {AssertionResult.setFailure(true);AssertionResult.setFailureMessage(&apos;Итоговое name не соответствует отправленным данным&apos;)}
+   } catch(Exception ex) {AssertionResult.setFailure(true);AssertionResult.setFailureMessage(&apos;Не удалось прочитать name из GET: &apos;+ex.message)}
+ }
+}
+</stringProp>
+            </JSR223Assertion>
+            <hashTree/>
+          </hashTree>
+        </hashTree>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="3 Обновление и удаление одного Ticket" enabled="false">
+        <intProp name="ThreadGroup.num_threads">2</intProp>
+        <intProp name="ThreadGroup.ramp_time">0</intProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController">
+          <stringProp name="LoopController.loops">1</stringProp>
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+        </elementProp>
+      </ThreadGroup>
+      <hashTree>
+        <CookieManager guiclass="CookiePanel" testclass="CookieManager" testname="Отдельная сессия каждого потока" enabled="true">
+          <collectionProp name="CookieManager.cookies"/>
+          <boolProp name="CookieManager.clearEachIteration">true</boolProp>
+          <boolProp name="CookieManager.controlledByThreadGroup">false</boolProp>
+        </CookieManager>
+        <hashTree/>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="Подготовка и проверка настроек" enabled="true">
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="script">import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+int scenario = 3
+ 
+try {
+ int index = ctx.getThreadNum()
+ String run = props.get(&apos;is_lab_run&apos;)
+ assert run : &apos;Включите служебную группу 00&apos;
+ def parse = { String key -&gt;
+   def data = new JsonSlurper().parseText(vars.get(key))
+   assert data instanceof Map &amp;&amp; !data.isEmpty() : &apos;Заполните &apos;+key+&apos; валидным JSON DTO&apos;
+   data
+ }
+ def users = new JsonSlurper().parseText(vars.get(&apos;users_json&apos;))
+ assert users.size() &gt;= 2 &amp;&amp; users[0].username != users[1].username : &apos;Нужны два разных пользователя&apos;
+ assert !vars.get(&apos;users_json&apos;).contains(&apos;FILL_&apos;) : &apos;Заполните users_json&apos;
+ vars.put(&apos;login_body&apos;,JsonOutput.toJson(users[index % users.size()]))
+ vars.put(&apos;scenario&apos;,scenario.toString())
+ vars.put(&apos;test_name&apos;,&apos;JM_&apos;+run+&apos;_S&apos;+scenario)
+ String operation = scenario == 1 ? [&apos;create&apos;,&apos;update&apos;,&apos;delete&apos;,&apos;import&apos;][index] :
+   scenario == 2 ? &apos;update&apos; : scenario == 3 ? (index == 0 ? &apos;update&apos; : &apos;delete&apos;) :
+   scenario == 4 ? &apos;delete&apos; : scenario == 5 ? &apos;event&apos; : scenario == 6 ? &apos;venue&apos; : &apos;import&apos;
+ vars.put(&apos;operation&apos;,operation)
+ String idKey = scenario == 1 ? (operation == &apos;update&apos; ? &apos;crud_update_id&apos; : &apos;crud_delete_id&apos;) :
+   scenario == 2 ? &apos;update_same_id&apos; : scenario == 3 ? &apos;update_delete_id&apos; : &apos;delete_same_id&apos;
+ String id = vars.get(idKey)
+ if (operation in [&apos;update&apos;,&apos;delete&apos;]) assert id?.isInteger() &amp;&amp; id.toInteger()&gt;0 : &apos;Заполните &apos;+idKey
+ vars.put(&apos;target_id&apos;,id ?: &apos;&apos;)
+ String path = vars.get(&apos;tickets_path&apos;)
+ String method = &apos;POST&apos;
+ def body = null
+ switch(operation) {
+ case &apos;create&apos;: body=parse(&apos;ticket_create_json&apos;); body.name=vars.get(&apos;test_name&apos;)+&apos;_CREATE&apos;; break
+ case &apos;update&apos;: path+=&apos;/&apos;+id; method=vars.get(&apos;update_method&apos;); body=parse(&apos;ticket_update_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_USER&apos;+(index+1);break
+ case &apos;delete&apos;: path+=&apos;/&apos;+id;method=&apos;DELETE&apos;;break
+ case &apos;event&apos;:path=vars.get(&apos;events_path&apos;);body=parse(&apos;event_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_EVENT&apos;;break
+ case &apos;venue&apos;:path=vars.get(&apos;venues_path&apos;);body=parse(&apos;venue_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_VENUE&apos;;break
+ case &apos;import&apos;:
+   path=vars.get(&apos;import_path&apos;)
+   String raw=vars.get(&apos;import_json&apos;)
+   parse(&apos;import_json&apos;)
+   assert raw.contains(&apos;@EVENT@&apos;) &amp;&amp; raw.contains(&apos;@VENUE@&apos;) : &apos;Добавьте @EVENT@ и @VENUE@ в имена объектов import_json&apos;
+   raw=raw.replace(&apos;@EVENT@&apos;,vars.get(&apos;test_name&apos;)+&apos;_EVENT&apos;).replace(&apos;@VENUE@&apos;,vars.get(&apos;test_name&apos;)+&apos;_VENUE&apos;)
+   def file=File.createTempFile(&apos;is-lab-import-&apos;,&apos;.json&apos;);file.setText(raw,&apos;UTF-8&apos;);file.deleteOnExit()
+   vars.put(&apos;import_file&apos;,file.absolutePath)
+   break
+ }
+ vars.put(&apos;action_path&apos;,path);vars.put(&apos;action_method&apos;,method)
+ vars.put(&apos;action_body&apos;,body == null ? &apos;&apos; : JsonOutput.toJson(body))
+ SampleResult.setSuccessful(true)
+ SampleResult.setResponseData(&apos;Scenario &apos;+scenario+&apos; / &apos;+operation+&apos; / &apos;+vars.get(&apos;test_name&apos;),&apos;UTF-8&apos;)
+} catch (Throwable ex) {
+ SampleResult.setSuccessful(false);SampleResult.setResponseCode(&apos;CONFIG_ERROR&apos;)
+ SampleResult.setResponseMessage(ex.message);SampleResult.setStopThread(true)
+}
+</stringProp>
+        </JSR223Sampler>
+        <hashTree/>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Login" enabled="true">
+          <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+          <intProp name="HTTPSampler.response_timeout">30000</intProp>
+          <stringProp name="HTTPSampler.domain">${host}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">${login_path}</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">${login_body}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+          <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="JSON Content-Type" enabled="true">
+            <collectionProp name="HeaderManager.headers">
+              <elementProp name="" elementType="Header">
+                <stringProp name="Header.name">Content-Type</stringProp>
+                <stringProp name="Header.value">application/json</stringProp>
+              </elementProp>
+            </collectionProp>
+          </HeaderManager>
+          <hashTree/>
+          <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Не продолжать при ошибке входа" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">if (!(prev.responseCode ==~ /2\d\d/)) {
+ prev.setSuccessful(false);prev.setStopThread(true)
+}
+</stringProp>
+          </JSR223PostProcessor>
+          <hashTree/>
+        </hashTree>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Операция" enabled="true">
+          <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+          <intProp name="HTTPSampler.response_timeout">30000</intProp>
+          <stringProp name="HTTPSampler.domain">${host}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">${action_path}</stringProp>
+          <stringProp name="HTTPSampler.method">${action_method}</stringProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+            <collectionProp name="Arguments.arguments"/>
+          </elementProp>
+          <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="JSON или multipart из встроенного шаблона" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">
+import org.apache.jmeter.protocol.http.control.HeaderManager
+import org.apache.jmeter.protocol.http.control.Header
+import org.apache.jmeter.protocol.http.util.HTTPFileArg
+def headers=new HeaderManager()
+headers.add(new Header(&apos;Accept&apos;,&apos;application/json&apos;))
+sampler.getArguments().removeAllArguments()
+sampler.setHTTPFiles(new HTTPFileArg[0])
+sampler.setDoMultipartPost(false);sampler.setPostBodyRaw(false)
+if(vars.get(&apos;operation&apos;)==&apos;import&apos;) {
+ sampler.setDoMultipartPost(true)
+ sampler.setHTTPFiles([new HTTPFileArg(vars.get(&apos;import_file&apos;),vars.get(&apos;import_part&apos;),&apos;application/json&apos;)] as HTTPFileArg[])
+} else if(vars.get(&apos;action_body&apos;)) {
+ headers.add(new Header(&apos;Content-Type&apos;,&apos;application/json&apos;))
+ sampler.addNonEncodedArgument(&apos;&apos;,vars.get(&apos;action_body&apos;),&apos;&apos;)
+ sampler.setPostBodyRaw(true)
+}
+sampler.setHeaderManager(headers)
+</stringProp>
+          </JSR223PreProcessor>
+          <hashTree/>
+          <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="СТАРТ — барьер только для конкурентной операции" enabled="true">
+            <intProp name="groupSize">0</intProp>
+            <longProp name="timeoutInMs">30000</longProp>
+          </SyncTimer>
+          <hashTree/>
+          <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Сохранить ответы для общего итога" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">
+def code=prev.responseCode
+boolean ok=code ==~ /2\d\d/
+def allowed=vars.get(&apos;conflict_codes&apos;).split(&apos;,&apos;).collect {it.trim()}
+int s=vars.get(&apos;scenario&apos;).toInteger()
+boolean expected=ok || (s!=1 &amp;&amp; (allowed.contains(code) || (s in [3,4] &amp;&amp; code==&apos;404&apos;)))
+prev.setSuccessful(expected)
+props.get(&apos;is_lab_results_&apos;+s).put(ctx.getThreadNum(),[code:code,ok:ok,expected:expected,operation:vars.get(&apos;operation&apos;)])
+if(ok &amp;&amp; vars.get(&apos;operation&apos;)==&apos;create&apos;) {
+ try { vars.put(&apos;target_id&apos;,new groovy.json.JsonSlurper().parseText(prev.responseDataAsString).id.toString()) }
+ catch(Exception ignored) { log.warn(&apos;Не удалось извлечь id созданного Ticket: проверьте формат ответа&apos;) }
+}
+if(vars.get(&apos;import_file&apos;)) new File(vars.get(&apos;import_file&apos;)).delete()
+</stringProp>
+          </JSR223PostProcessor>
+          <hashTree/>
+        </hashTree>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="Итог" enabled="true">
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="script">
+int s=vars.get(&apos;scenario&apos;).toInteger()
+def results=props.get(&apos;is_lab_results_&apos;+s)
+int expected=ctx.getThreadGroup().getNumThreads()
+def all=results.values().toList()
+int success=all.count {it.ok}
+boolean passed=all.size()==expected &amp;&amp; all.every {it.expected}
+if(s in [5,6,7]) passed=passed &amp;&amp; success==1
+if(s in [2,3,4]) passed=passed &amp;&amp; success&gt;=1
+SampleResult.setSuccessful(passed)
+SampleResult.setResponseCode(passed ? &apos;200&apos; : &apos;ASSERTION_FAILED&apos;)
+SampleResult.setResponseData(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
+ scenario:s,marker:vars.get(&apos;test_name&apos;),responses:results,successCount:success,
+ note:&apos;Проверены HTTP-ответы. Уникальность и откат подтвердите в БД. Два успешных UPDATE не доказывают lost update.&apos;
+])), &apos;UTF-8&apos;)
+</stringProp>
+        </JSR223Sampler>
+        <hashTree>
+          <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Конец" enabled="true">
+            <intProp name="groupSize">0</intProp>
+            <longProp name="timeoutInMs">30000</longProp>
+          </SyncTimer>
+          <hashTree/>
+        </hashTree>
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="GET итогового Ticket" enabled="true">
+          <stringProp name="IfController.condition">${__groovy(vars.get(&apos;operation&apos;) != &apos;import&apos;)}</stringProp>
+          <boolProp name="IfController.evaluateAll">false</boolProp>
+          <boolProp name="IfController.useExpression">true</boolProp>
+        </IfController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET итогового состояния" enabled="true">
+            <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+            <intProp name="HTTPSampler.response_timeout">30000</intProp>
+            <stringProp name="HTTPSampler.domain">${host}</stringProp>
+            <stringProp name="HTTPSampler.port">${port}</stringProp>
+            <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+            <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+            <stringProp name="HTTPSampler.path">${tickets_path}/${target_id}</stringProp>
+            <stringProp name="HTTPSampler.method">GET</stringProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+              <collectionProp name="Arguments.arguments"/>
+            </elementProp>
+            <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <JSR223Assertion guiclass="TestBeanGUI" testclass="JSR223Assertion" testname="Проверить отсутствие после успешного DELETE" enabled="true">
+              <stringProp name="scriptLanguage">groovy</stringProp>
+              <stringProp name="cacheKey">true</stringProp>
+              <stringProp name="filename"></stringProp>
+              <stringProp name="parameters"></stringProp>
+              <stringProp name="script">
+int s=vars.get(&apos;scenario&apos;).toInteger()
+def results=props.get(&apos;is_lab_results_&apos;+s).values()
+boolean deleted=s==1 ? vars.get(&apos;operation&apos;)==&apos;delete&apos; &amp;&amp; results.any{it.operation==&apos;delete&apos; &amp;&amp; it.ok} : results.any{it.operation==&apos;delete&apos; &amp;&amp; it.ok}
+String expected=deleted ? &apos;404&apos; : &apos;200&apos;
+if(prev.responseCode!=expected) {
+ AssertionResult.setFailure(true);AssertionResult.setFailureMessage(&apos;Ожидался GET &apos;+expected+&apos;, получен &apos;+prev.responseCode)
+} else {
+ prev.setSuccessful(true)
+ if(!deleted &amp;&amp; s in [1,2]) {
+   try {
+    def data=new groovy.json.JsonSlurper().parseText(prev.responseDataAsString)
+    def prefix=vars.get(&apos;test_name&apos;)
+    def allowed=s==2 ? [prefix+&apos;_USER1&apos;,prefix+&apos;_USER2&apos;] : [new groovy.json.JsonSlurper().parseText(vars.get(&apos;action_body&apos;)).name]
+    if(!(data.name in allowed)) {AssertionResult.setFailure(true);AssertionResult.setFailureMessage(&apos;Итоговое name не соответствует отправленным данным&apos;)}
+   } catch(Exception ex) {AssertionResult.setFailure(true);AssertionResult.setFailureMessage(&apos;Не удалось прочитать name из GET: &apos;+ex.message)}
+ }
+}
+</stringProp>
+            </JSR223Assertion>
+            <hashTree/>
+          </hashTree>
+        </hashTree>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="4 Параллельное удаление одного Ticket" enabled="false">
+        <intProp name="ThreadGroup.num_threads">2</intProp>
+        <intProp name="ThreadGroup.ramp_time">0</intProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController">
+          <stringProp name="LoopController.loops">1</stringProp>
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+        </elementProp>
+      </ThreadGroup>
+      <hashTree>
+        <CookieManager guiclass="CookiePanel" testclass="CookieManager" testname="Отдельная сессия каждого потока" enabled="true">
+          <collectionProp name="CookieManager.cookies"/>
+          <boolProp name="CookieManager.clearEachIteration">true</boolProp>
+          <boolProp name="CookieManager.controlledByThreadGroup">false</boolProp>
+        </CookieManager>
+        <hashTree/>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="Подготовка и проверка настроек" enabled="true">
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="script">import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+int scenario = 4
+ 
+try {
+ int index = ctx.getThreadNum()
+ String run = props.get(&apos;is_lab_run&apos;)
+ assert run : &apos;Включите служебную группу 00&apos;
+ def parse = { String key -&gt;
+   def data = new JsonSlurper().parseText(vars.get(key))
+   assert data instanceof Map &amp;&amp; !data.isEmpty() : &apos;Заполните &apos;+key+&apos; валидным JSON DTO&apos;
+   data
+ }
+ def users = new JsonSlurper().parseText(vars.get(&apos;users_json&apos;))
+ assert users.size() &gt;= 2 &amp;&amp; users[0].username != users[1].username : &apos;Нужны два разных пользователя&apos;
+ assert !vars.get(&apos;users_json&apos;).contains(&apos;FILL_&apos;) : &apos;Заполните users_json&apos;
+ vars.put(&apos;login_body&apos;,JsonOutput.toJson(users[index % users.size()]))
+ vars.put(&apos;scenario&apos;,scenario.toString())
+ vars.put(&apos;test_name&apos;,&apos;JM_&apos;+run+&apos;_S&apos;+scenario)
+ String operation = scenario == 1 ? [&apos;create&apos;,&apos;update&apos;,&apos;delete&apos;,&apos;import&apos;][index] :
+   scenario == 2 ? &apos;update&apos; : scenario == 3 ? (index == 0 ? &apos;update&apos; : &apos;delete&apos;) :
+   scenario == 4 ? &apos;delete&apos; : scenario == 5 ? &apos;event&apos; : scenario == 6 ? &apos;venue&apos; : &apos;import&apos;
+ vars.put(&apos;operation&apos;,operation)
+ String idKey = scenario == 1 ? (operation == &apos;update&apos; ? &apos;crud_update_id&apos; : &apos;crud_delete_id&apos;) :
+   scenario == 2 ? &apos;update_same_id&apos; : scenario == 3 ? &apos;update_delete_id&apos; : &apos;delete_same_id&apos;
+ String id = vars.get(idKey)
+ if (operation in [&apos;update&apos;,&apos;delete&apos;]) assert id?.isInteger() &amp;&amp; id.toInteger()&gt;0 : &apos;Заполните &apos;+idKey
+ vars.put(&apos;target_id&apos;,id ?: &apos;&apos;)
+ String path = vars.get(&apos;tickets_path&apos;)
+ String method = &apos;POST&apos;
+ def body = null
+ switch(operation) {
+ case &apos;create&apos;: body=parse(&apos;ticket_create_json&apos;); body.name=vars.get(&apos;test_name&apos;)+&apos;_CREATE&apos;; break
+ case &apos;update&apos;: path+=&apos;/&apos;+id; method=vars.get(&apos;update_method&apos;); body=parse(&apos;ticket_update_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_USER&apos;+(index+1);break
+ case &apos;delete&apos;: path+=&apos;/&apos;+id;method=&apos;DELETE&apos;;break
+ case &apos;event&apos;:path=vars.get(&apos;events_path&apos;);body=parse(&apos;event_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_EVENT&apos;;break
+ case &apos;venue&apos;:path=vars.get(&apos;venues_path&apos;);body=parse(&apos;venue_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_VENUE&apos;;break
+ case &apos;import&apos;:
+   path=vars.get(&apos;import_path&apos;)
+   String raw=vars.get(&apos;import_json&apos;)
+   parse(&apos;import_json&apos;)
+   assert raw.contains(&apos;@EVENT@&apos;) &amp;&amp; raw.contains(&apos;@VENUE@&apos;) : &apos;Добавьте @EVENT@ и @VENUE@ в имена объектов import_json&apos;
+   raw=raw.replace(&apos;@EVENT@&apos;,vars.get(&apos;test_name&apos;)+&apos;_EVENT&apos;).replace(&apos;@VENUE@&apos;,vars.get(&apos;test_name&apos;)+&apos;_VENUE&apos;)
+   def file=File.createTempFile(&apos;is-lab-import-&apos;,&apos;.json&apos;);file.setText(raw,&apos;UTF-8&apos;);file.deleteOnExit()
+   vars.put(&apos;import_file&apos;,file.absolutePath)
+   break
+ }
+ vars.put(&apos;action_path&apos;,path);vars.put(&apos;action_method&apos;,method)
+ vars.put(&apos;action_body&apos;,body == null ? &apos;&apos; : JsonOutput.toJson(body))
+ SampleResult.setSuccessful(true)
+ SampleResult.setResponseData(&apos;Scenario &apos;+scenario+&apos; / &apos;+operation+&apos; / &apos;+vars.get(&apos;test_name&apos;),&apos;UTF-8&apos;)
+} catch (Throwable ex) {
+ SampleResult.setSuccessful(false);SampleResult.setResponseCode(&apos;CONFIG_ERROR&apos;)
+ SampleResult.setResponseMessage(ex.message);SampleResult.setStopThread(true)
+}
+</stringProp>
+        </JSR223Sampler>
+        <hashTree/>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Login" enabled="true">
+          <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+          <intProp name="HTTPSampler.response_timeout">30000</intProp>
+          <stringProp name="HTTPSampler.domain">${host}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">${login_path}</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">${login_body}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+          <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="JSON Content-Type" enabled="true">
+            <collectionProp name="HeaderManager.headers">
+              <elementProp name="" elementType="Header">
+                <stringProp name="Header.name">Content-Type</stringProp>
+                <stringProp name="Header.value">application/json</stringProp>
+              </elementProp>
+            </collectionProp>
+          </HeaderManager>
+          <hashTree/>
+          <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Не продолжать при ошибке входа" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">if (!(prev.responseCode ==~ /2\d\d/)) {
+ prev.setSuccessful(false);prev.setStopThread(true)
+}
+</stringProp>
+          </JSR223PostProcessor>
+          <hashTree/>
+        </hashTree>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Конкурентная операция" enabled="true">
+          <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+          <intProp name="HTTPSampler.response_timeout">30000</intProp>
+          <stringProp name="HTTPSampler.domain">${host}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">${action_path}</stringProp>
+          <stringProp name="HTTPSampler.method">${action_method}</stringProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+            <collectionProp name="Arguments.arguments"/>
+          </elementProp>
+          <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="JSON или multipart из встроенного шаблона" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">
+import org.apache.jmeter.protocol.http.control.HeaderManager
+import org.apache.jmeter.protocol.http.control.Header
+import org.apache.jmeter.protocol.http.util.HTTPFileArg
+def headers=new HeaderManager()
+headers.add(new Header(&apos;Accept&apos;,&apos;application/json&apos;))
+sampler.getArguments().removeAllArguments()
+sampler.setHTTPFiles(new HTTPFileArg[0])
+sampler.setDoMultipartPost(false);sampler.setPostBodyRaw(false)
+if(vars.get(&apos;operation&apos;)==&apos;import&apos;) {
+ sampler.setDoMultipartPost(true)
+ sampler.setHTTPFiles([new HTTPFileArg(vars.get(&apos;import_file&apos;),vars.get(&apos;import_part&apos;),&apos;application/json&apos;)] as HTTPFileArg[])
+} else if(vars.get(&apos;action_body&apos;)) {
+ headers.add(new Header(&apos;Content-Type&apos;,&apos;application/json&apos;))
+ sampler.addNonEncodedArgument(&apos;&apos;,vars.get(&apos;action_body&apos;),&apos;&apos;)
+ sampler.setPostBodyRaw(true)
+}
+sampler.setHeaderManager(headers)
+</stringProp>
+          </JSR223PreProcessor>
+          <hashTree/>
+          <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="СТАРТ — барьер только для конкурентной операции" enabled="true">
+            <intProp name="groupSize">0</intProp>
+            <longProp name="timeoutInMs">30000</longProp>
+          </SyncTimer>
+          <hashTree/>
+          <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Сохранить ответы для общего итога" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">
+def code=prev.responseCode
+boolean ok=code ==~ /2\d\d/
+def allowed=vars.get(&apos;conflict_codes&apos;).split(&apos;,&apos;).collect {it.trim()}
+int s=vars.get(&apos;scenario&apos;).toInteger()
+boolean expected=ok || (s!=1 &amp;&amp; (allowed.contains(code) || (s in [3,4] &amp;&amp; code==&apos;404&apos;)))
+prev.setSuccessful(expected)
+props.get(&apos;is_lab_results_&apos;+s).put(ctx.getThreadNum(),[code:code,ok:ok,expected:expected,operation:vars.get(&apos;operation&apos;)])
+if(ok &amp;&amp; vars.get(&apos;operation&apos;)==&apos;create&apos;) {
+ try { vars.put(&apos;target_id&apos;,new groovy.json.JsonSlurper().parseText(prev.responseDataAsString).id.toString()) }
+ catch(Exception ignored) { log.warn(&apos;Не удалось извлечь id созданного Ticket: проверьте формат ответа&apos;) }
+}
+if(vars.get(&apos;import_file&apos;)) new File(vars.get(&apos;import_file&apos;)).delete()
+</stringProp>
+          </JSR223PostProcessor>
+          <hashTree/>
+        </hashTree>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="Итог" enabled="true">
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="script">
+int s=vars.get(&apos;scenario&apos;).toInteger()
+def results=props.get(&apos;is_lab_results_&apos;+s)
+int expected=ctx.getThreadGroup().getNumThreads()
+def all=results.values().toList()
+int success=all.count {it.ok}
+boolean passed=all.size()==expected &amp;&amp; all.every {it.expected}
+if(s in [5,6,7]) passed=passed &amp;&amp; success==1
+if(s in [2,3,4]) passed=passed &amp;&amp; success&gt;=1
+SampleResult.setSuccessful(passed)
+SampleResult.setResponseCode(passed ? &apos;200&apos; : &apos;ASSERTION_FAILED&apos;)
+SampleResult.setResponseData(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
+ scenario:s,marker:vars.get(&apos;test_name&apos;),responses:results,successCount:success,
+ note:&apos;Проверены HTTP-ответы. Уникальность и откат подтвердите в БД. Два успешных UPDATE не доказывают lost update.&apos;
+])), &apos;UTF-8&apos;)
+</stringProp>
+        </JSR223Sampler>
+        <hashTree>
+          <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Финиш" enabled="true">
+            <intProp name="groupSize">0</intProp>
+            <longProp name="timeoutInMs">30000</longProp>
+          </SyncTimer>
+          <hashTree/>
+        </hashTree>
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="GET итогового Ticket" enabled="true">
+          <stringProp name="IfController.condition">${__groovy(vars.get(&apos;operation&apos;) != &apos;import&apos;)}</stringProp>
+          <boolProp name="IfController.evaluateAll">false</boolProp>
+          <boolProp name="IfController.useExpression">true</boolProp>
+        </IfController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET итогового состояния" enabled="true">
+            <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+            <intProp name="HTTPSampler.response_timeout">30000</intProp>
+            <stringProp name="HTTPSampler.domain">${host}</stringProp>
+            <stringProp name="HTTPSampler.port">${port}</stringProp>
+            <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+            <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+            <stringProp name="HTTPSampler.path">${tickets_path}/${target_id}</stringProp>
+            <stringProp name="HTTPSampler.method">GET</stringProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+              <collectionProp name="Arguments.arguments"/>
+            </elementProp>
+            <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <JSR223Assertion guiclass="TestBeanGUI" testclass="JSR223Assertion" testname="Проверить отсутствие после успешного DELETE" enabled="true">
+              <stringProp name="scriptLanguage">groovy</stringProp>
+              <stringProp name="cacheKey">true</stringProp>
+              <stringProp name="filename"></stringProp>
+              <stringProp name="parameters"></stringProp>
+              <stringProp name="script">
+int s=vars.get(&apos;scenario&apos;).toInteger()
+def results=props.get(&apos;is_lab_results_&apos;+s).values()
+boolean deleted=s==1 ? vars.get(&apos;operation&apos;)==&apos;delete&apos; &amp;&amp; results.any{it.operation==&apos;delete&apos; &amp;&amp; it.ok} : results.any{it.operation==&apos;delete&apos; &amp;&amp; it.ok}
+String expected=deleted ? &apos;404&apos; : &apos;200&apos;
+if(prev.responseCode!=expected) {
+ AssertionResult.setFailure(true);AssertionResult.setFailureMessage(&apos;Ожидался GET &apos;+expected+&apos;, получен &apos;+prev.responseCode)
+} else {
+ prev.setSuccessful(true)
+ if(!deleted &amp;&amp; s in [1,2]) {
+   try {
+    def data=new groovy.json.JsonSlurper().parseText(prev.responseDataAsString)
+    def prefix=vars.get(&apos;test_name&apos;)
+    def allowed=s==2 ? [prefix+&apos;_USER1&apos;,prefix+&apos;_USER2&apos;] : [new groovy.json.JsonSlurper().parseText(vars.get(&apos;action_body&apos;)).name]
+    if(!(data.name in allowed)) {AssertionResult.setFailure(true);AssertionResult.setFailureMessage(&apos;Итоговое name не соответствует отправленным данным&apos;)}
+   } catch(Exception ex) {AssertionResult.setFailure(true);AssertionResult.setFailureMessage(&apos;Не удалось прочитать name из GET: &apos;+ex.message)}
+ }
+}
+</stringProp>
+            </JSR223Assertion>
+            <hashTree/>
+          </hashTree>
+        </hashTree>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="5 Уникальность Event.name" enabled="false">
+        <intProp name="ThreadGroup.num_threads">2</intProp>
+        <intProp name="ThreadGroup.ramp_time">0</intProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController">
+          <stringProp name="LoopController.loops">1</stringProp>
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+        </elementProp>
+      </ThreadGroup>
+      <hashTree>
+        <CookieManager guiclass="CookiePanel" testclass="CookieManager" testname="Отдельная сессия каждого потока" enabled="true">
+          <collectionProp name="CookieManager.cookies"/>
+          <boolProp name="CookieManager.clearEachIteration">true</boolProp>
+          <boolProp name="CookieManager.controlledByThreadGroup">false</boolProp>
+        </CookieManager>
+        <hashTree/>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="Подготовка и проверка настроек" enabled="true">
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="script">import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+int scenario = 5
+ 
+try {
+ int index = ctx.getThreadNum()
+ String run = props.get(&apos;is_lab_run&apos;)
+ assert run : &apos;Включите служебную группу 00&apos;
+ def parse = { String key -&gt;
+   def data = new JsonSlurper().parseText(vars.get(key))
+   assert data instanceof Map &amp;&amp; !data.isEmpty() : &apos;Заполните &apos;+key+&apos; валидным JSON DTO&apos;
+   data
+ }
+ def users = new JsonSlurper().parseText(vars.get(&apos;users_json&apos;))
+ assert users.size() &gt;= 2 &amp;&amp; users[0].username != users[1].username : &apos;Нужны два разных пользователя&apos;
+ assert !vars.get(&apos;users_json&apos;).contains(&apos;FILL_&apos;) : &apos;Заполните users_json&apos;
+ vars.put(&apos;login_body&apos;,JsonOutput.toJson(users[index % users.size()]))
+ vars.put(&apos;scenario&apos;,scenario.toString())
+ vars.put(&apos;test_name&apos;,&apos;JM_&apos;+run+&apos;_S&apos;+scenario)
+ String operation = scenario == 1 ? [&apos;create&apos;,&apos;update&apos;,&apos;delete&apos;,&apos;import&apos;][index] :
+   scenario == 2 ? &apos;update&apos; : scenario == 3 ? (index == 0 ? &apos;update&apos; : &apos;delete&apos;) :
+   scenario == 4 ? &apos;delete&apos; : scenario == 5 ? &apos;event&apos; : scenario == 6 ? &apos;venue&apos; : &apos;import&apos;
+ vars.put(&apos;operation&apos;,operation)
+ String idKey = scenario == 1 ? (operation == &apos;update&apos; ? &apos;crud_update_id&apos; : &apos;crud_delete_id&apos;) :
+   scenario == 2 ? &apos;update_same_id&apos; : scenario == 3 ? &apos;update_delete_id&apos; : &apos;delete_same_id&apos;
+ String id = vars.get(idKey)
+ if (operation in [&apos;update&apos;,&apos;delete&apos;]) assert id?.isInteger() &amp;&amp; id.toInteger()&gt;0 : &apos;Заполните &apos;+idKey
+ vars.put(&apos;target_id&apos;,id ?: &apos;&apos;)
+ String path = vars.get(&apos;tickets_path&apos;)
+ String method = &apos;POST&apos;
+ def body = null
+ switch(operation) {
+ case &apos;create&apos;: body=parse(&apos;ticket_create_json&apos;); body.name=vars.get(&apos;test_name&apos;)+&apos;_CREATE&apos;; break
+ case &apos;update&apos;: path+=&apos;/&apos;+id; method=vars.get(&apos;update_method&apos;); body=parse(&apos;ticket_update_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_USER&apos;+(index+1);break
+ case &apos;delete&apos;: path+=&apos;/&apos;+id;method=&apos;DELETE&apos;;break
+ case &apos;event&apos;:path=vars.get(&apos;events_path&apos;);body=parse(&apos;event_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_EVENT&apos;;break
+ case &apos;venue&apos;:path=vars.get(&apos;venues_path&apos;);body=parse(&apos;venue_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_VENUE&apos;;break
+ case &apos;import&apos;:
+   path=vars.get(&apos;import_path&apos;)
+   String raw=vars.get(&apos;import_json&apos;)
+   parse(&apos;import_json&apos;)
+   assert raw.contains(&apos;@EVENT@&apos;) &amp;&amp; raw.contains(&apos;@VENUE@&apos;) : &apos;Добавьте @EVENT@ и @VENUE@ в имена объектов import_json&apos;
+   raw=raw.replace(&apos;@EVENT@&apos;,vars.get(&apos;test_name&apos;)+&apos;_EVENT&apos;).replace(&apos;@VENUE@&apos;,vars.get(&apos;test_name&apos;)+&apos;_VENUE&apos;)
+   def file=File.createTempFile(&apos;is-lab-import-&apos;,&apos;.json&apos;);file.setText(raw,&apos;UTF-8&apos;);file.deleteOnExit()
+   vars.put(&apos;import_file&apos;,file.absolutePath)
+   break
+ }
+ vars.put(&apos;action_path&apos;,path);vars.put(&apos;action_method&apos;,method)
+ vars.put(&apos;action_body&apos;,body == null ? &apos;&apos; : JsonOutput.toJson(body))
+ SampleResult.setSuccessful(true)
+ SampleResult.setResponseData(&apos;Scenario &apos;+scenario+&apos; / &apos;+operation+&apos; / &apos;+vars.get(&apos;test_name&apos;),&apos;UTF-8&apos;)
+} catch (Throwable ex) {
+ SampleResult.setSuccessful(false);SampleResult.setResponseCode(&apos;CONFIG_ERROR&apos;)
+ SampleResult.setResponseMessage(ex.message);SampleResult.setStopThread(true)
+}
+</stringProp>
+        </JSR223Sampler>
+        <hashTree/>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Login" enabled="true">
+          <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+          <intProp name="HTTPSampler.response_timeout">30000</intProp>
+          <stringProp name="HTTPSampler.domain">${host}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">${login_path}</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">${login_body}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+          <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="JSON Content-Type" enabled="true">
+            <collectionProp name="HeaderManager.headers">
+              <elementProp name="" elementType="Header">
+                <stringProp name="Header.name">Content-Type</stringProp>
+                <stringProp name="Header.value">application/json</stringProp>
+              </elementProp>
+            </collectionProp>
+          </HeaderManager>
+          <hashTree/>
+          <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Не продолжать при ошибке входа" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">if (!(prev.responseCode ==~ /2\d\d/)) {
+ prev.setSuccessful(false);prev.setStopThread(true)
+}
+</stringProp>
+          </JSR223PostProcessor>
+          <hashTree/>
+        </hashTree>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Конкурентная операция" enabled="true">
+          <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+          <intProp name="HTTPSampler.response_timeout">30000</intProp>
+          <stringProp name="HTTPSampler.domain">${host}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">${action_path}</stringProp>
+          <stringProp name="HTTPSampler.method">${action_method}</stringProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+            <collectionProp name="Arguments.arguments"/>
+          </elementProp>
+          <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="JSON или multipart из встроенного шаблона" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">
+import org.apache.jmeter.protocol.http.control.HeaderManager
+import org.apache.jmeter.protocol.http.control.Header
+import org.apache.jmeter.protocol.http.util.HTTPFileArg
+def headers=new HeaderManager()
+headers.add(new Header(&apos;Accept&apos;,&apos;application/json&apos;))
+sampler.getArguments().removeAllArguments()
+sampler.setHTTPFiles(new HTTPFileArg[0])
+sampler.setDoMultipartPost(false);sampler.setPostBodyRaw(false)
+if(vars.get(&apos;operation&apos;)==&apos;import&apos;) {
+ sampler.setDoMultipartPost(true)
+ sampler.setHTTPFiles([new HTTPFileArg(vars.get(&apos;import_file&apos;),vars.get(&apos;import_part&apos;),&apos;application/json&apos;)] as HTTPFileArg[])
+} else if(vars.get(&apos;action_body&apos;)) {
+ headers.add(new Header(&apos;Content-Type&apos;,&apos;application/json&apos;))
+ sampler.addNonEncodedArgument(&apos;&apos;,vars.get(&apos;action_body&apos;),&apos;&apos;)
+ sampler.setPostBodyRaw(true)
+}
+sampler.setHeaderManager(headers)
+</stringProp>
+          </JSR223PreProcessor>
+          <hashTree/>
+          <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Старт" enabled="true">
+            <intProp name="groupSize">0</intProp>
+            <longProp name="timeoutInMs">30000</longProp>
+          </SyncTimer>
+          <hashTree/>
+          <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Сохранить ответы для общего итога" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">
+def code=prev.responseCode
+boolean ok=code ==~ /2\d\d/
+def allowed=vars.get(&apos;conflict_codes&apos;).split(&apos;,&apos;).collect {it.trim()}
+int s=vars.get(&apos;scenario&apos;).toInteger()
+boolean expected=ok || (s!=1 &amp;&amp; (allowed.contains(code) || (s in [3,4] &amp;&amp; code==&apos;404&apos;)))
+prev.setSuccessful(expected)
+props.get(&apos;is_lab_results_&apos;+s).put(ctx.getThreadNum(),[code:code,ok:ok,expected:expected,operation:vars.get(&apos;operation&apos;)])
+if(ok &amp;&amp; vars.get(&apos;operation&apos;)==&apos;create&apos;) {
+ try { vars.put(&apos;target_id&apos;,new groovy.json.JsonSlurper().parseText(prev.responseDataAsString).id.toString()) }
+ catch(Exception ignored) { log.warn(&apos;Не удалось извлечь id созданного Ticket: проверьте формат ответа&apos;) }
+}
+if(vars.get(&apos;import_file&apos;)) new File(vars.get(&apos;import_file&apos;)).delete()
+</stringProp>
+          </JSR223PostProcessor>
+          <hashTree/>
+        </hashTree>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="Итог" enabled="true">
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="script">
+int s=vars.get(&apos;scenario&apos;).toInteger()
+def results=props.get(&apos;is_lab_results_&apos;+s)
+int expected=ctx.getThreadGroup().getNumThreads()
+def all=results.values().toList()
+int success=all.count {it.ok}
+boolean passed=all.size()==expected &amp;&amp; all.every {it.expected}
+if(s in [5,6,7]) passed=passed &amp;&amp; success==1
+if(s in [2,3,4]) passed=passed &amp;&amp; success&gt;=1
+SampleResult.setSuccessful(passed)
+SampleResult.setResponseCode(passed ? &apos;200&apos; : &apos;ASSERTION_FAILED&apos;)
+SampleResult.setResponseData(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
+ scenario:s,marker:vars.get(&apos;test_name&apos;),responses:results,successCount:success,
+ note:&apos;Проверены HTTP-ответы. Уникальность и откат подтвердите в БД. Два успешных UPDATE не доказывают lost update.&apos;
+])), &apos;UTF-8&apos;)
+</stringProp>
+        </JSR223Sampler>
+        <hashTree>
+          <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Финиш" enabled="true">
+            <intProp name="groupSize">0</intProp>
+            <longProp name="timeoutInMs">30000</longProp>
+          </SyncTimer>
+          <hashTree/>
+        </hashTree>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="6 Уникальность Venue.name" enabled="false">
+        <intProp name="ThreadGroup.num_threads">2</intProp>
+        <intProp name="ThreadGroup.ramp_time">0</intProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController">
+          <stringProp name="LoopController.loops">1</stringProp>
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+        </elementProp>
+      </ThreadGroup>
+      <hashTree>
+        <CookieManager guiclass="CookiePanel" testclass="CookieManager" testname="Отдельная сессия каждого потока" enabled="true">
+          <collectionProp name="CookieManager.cookies"/>
+          <boolProp name="CookieManager.clearEachIteration">true</boolProp>
+          <boolProp name="CookieManager.controlledByThreadGroup">false</boolProp>
+        </CookieManager>
+        <hashTree/>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="Подготовка и проверка настроек" enabled="true">
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="script">import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+int scenario = 6
+ 
+try {
+ int index = ctx.getThreadNum()
+ String run = props.get(&apos;is_lab_run&apos;)
+ assert run : &apos;Включите служебную группу 00&apos;
+ def parse = { String key -&gt;
+   def data = new JsonSlurper().parseText(vars.get(key))
+   assert data instanceof Map &amp;&amp; !data.isEmpty() : &apos;Заполните &apos;+key+&apos; валидным JSON DTO&apos;
+   data
+ }
+ def users = new JsonSlurper().parseText(vars.get(&apos;users_json&apos;))
+ assert users.size() &gt;= 2 &amp;&amp; users[0].username != users[1].username : &apos;Нужны два разных пользователя&apos;
+ assert !vars.get(&apos;users_json&apos;).contains(&apos;FILL_&apos;) : &apos;Заполните users_json&apos;
+ vars.put(&apos;login_body&apos;,JsonOutput.toJson(users[index % users.size()]))
+ vars.put(&apos;scenario&apos;,scenario.toString())
+ vars.put(&apos;test_name&apos;,&apos;JM_&apos;+run+&apos;_S&apos;+scenario)
+ String operation = scenario == 1 ? [&apos;create&apos;,&apos;update&apos;,&apos;delete&apos;,&apos;import&apos;][index] :
+   scenario == 2 ? &apos;update&apos; : scenario == 3 ? (index == 0 ? &apos;update&apos; : &apos;delete&apos;) :
+   scenario == 4 ? &apos;delete&apos; : scenario == 5 ? &apos;event&apos; : scenario == 6 ? &apos;venue&apos; : &apos;import&apos;
+ vars.put(&apos;operation&apos;,operation)
+ String idKey = scenario == 1 ? (operation == &apos;update&apos; ? &apos;crud_update_id&apos; : &apos;crud_delete_id&apos;) :
+   scenario == 2 ? &apos;update_same_id&apos; : scenario == 3 ? &apos;update_delete_id&apos; : &apos;delete_same_id&apos;
+ String id = vars.get(idKey)
+ if (operation in [&apos;update&apos;,&apos;delete&apos;]) assert id?.isInteger() &amp;&amp; id.toInteger()&gt;0 : &apos;Заполните &apos;+idKey
+ vars.put(&apos;target_id&apos;,id ?: &apos;&apos;)
+ String path = vars.get(&apos;tickets_path&apos;)
+ String method = &apos;POST&apos;
+ def body = null
+ switch(operation) {
+ case &apos;create&apos;: body=parse(&apos;ticket_create_json&apos;); body.name=vars.get(&apos;test_name&apos;)+&apos;_CREATE&apos;; break
+ case &apos;update&apos;: path+=&apos;/&apos;+id; method=vars.get(&apos;update_method&apos;); body=parse(&apos;ticket_update_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_USER&apos;+(index+1);break
+ case &apos;delete&apos;: path+=&apos;/&apos;+id;method=&apos;DELETE&apos;;break
+ case &apos;event&apos;:path=vars.get(&apos;events_path&apos;);body=parse(&apos;event_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_EVENT&apos;;break
+ case &apos;venue&apos;:path=vars.get(&apos;venues_path&apos;);body=parse(&apos;venue_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_VENUE&apos;;break
+ case &apos;import&apos;:
+   path=vars.get(&apos;import_path&apos;)
+   String raw=vars.get(&apos;import_json&apos;)
+   parse(&apos;import_json&apos;)
+   assert raw.contains(&apos;@EVENT@&apos;) &amp;&amp; raw.contains(&apos;@VENUE@&apos;) : &apos;Добавьте @EVENT@ и @VENUE@ в имена объектов import_json&apos;
+   raw=raw.replace(&apos;@EVENT@&apos;,vars.get(&apos;test_name&apos;)+&apos;_EVENT&apos;).replace(&apos;@VENUE@&apos;,vars.get(&apos;test_name&apos;)+&apos;_VENUE&apos;)
+   def file=File.createTempFile(&apos;is-lab-import-&apos;,&apos;.json&apos;);file.setText(raw,&apos;UTF-8&apos;);file.deleteOnExit()
+   vars.put(&apos;import_file&apos;,file.absolutePath)
+   break
+ }
+ vars.put(&apos;action_path&apos;,path);vars.put(&apos;action_method&apos;,method)
+ vars.put(&apos;action_body&apos;,body == null ? &apos;&apos; : JsonOutput.toJson(body))
+ SampleResult.setSuccessful(true)
+ SampleResult.setResponseData(&apos;Scenario &apos;+scenario+&apos; / &apos;+operation+&apos; / &apos;+vars.get(&apos;test_name&apos;),&apos;UTF-8&apos;)
+} catch (Throwable ex) {
+ SampleResult.setSuccessful(false);SampleResult.setResponseCode(&apos;CONFIG_ERROR&apos;)
+ SampleResult.setResponseMessage(ex.message);SampleResult.setStopThread(true)
+}
+</stringProp>
+        </JSR223Sampler>
+        <hashTree/>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Login" enabled="true">
+          <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+          <intProp name="HTTPSampler.response_timeout">30000</intProp>
+          <stringProp name="HTTPSampler.domain">${host}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">${login_path}</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">${login_body}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+          <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="JSON Content-Type" enabled="true">
+            <collectionProp name="HeaderManager.headers">
+              <elementProp name="" elementType="Header">
+                <stringProp name="Header.name">Content-Type</stringProp>
+                <stringProp name="Header.value">application/json</stringProp>
+              </elementProp>
+            </collectionProp>
+          </HeaderManager>
+          <hashTree/>
+          <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Не продолжать при ошибке входа" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">if (!(prev.responseCode ==~ /2\d\d/)) {
+ prev.setSuccessful(false);prev.setStopThread(true)
+}
+</stringProp>
+          </JSR223PostProcessor>
+          <hashTree/>
+        </hashTree>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Конкурентная операция" enabled="true">
+          <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+          <intProp name="HTTPSampler.response_timeout">30000</intProp>
+          <stringProp name="HTTPSampler.domain">${host}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">${action_path}</stringProp>
+          <stringProp name="HTTPSampler.method">${action_method}</stringProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+            <collectionProp name="Arguments.arguments"/>
+          </elementProp>
+          <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="JSON или multipart из встроенного шаблона" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">
+import org.apache.jmeter.protocol.http.control.HeaderManager
+import org.apache.jmeter.protocol.http.control.Header
+import org.apache.jmeter.protocol.http.util.HTTPFileArg
+def headers=new HeaderManager()
+headers.add(new Header(&apos;Accept&apos;,&apos;application/json&apos;))
+sampler.getArguments().removeAllArguments()
+sampler.setHTTPFiles(new HTTPFileArg[0])
+sampler.setDoMultipartPost(false);sampler.setPostBodyRaw(false)
+if(vars.get(&apos;operation&apos;)==&apos;import&apos;) {
+ sampler.setDoMultipartPost(true)
+ sampler.setHTTPFiles([new HTTPFileArg(vars.get(&apos;import_file&apos;),vars.get(&apos;import_part&apos;),&apos;application/json&apos;)] as HTTPFileArg[])
+} else if(vars.get(&apos;action_body&apos;)) {
+ headers.add(new Header(&apos;Content-Type&apos;,&apos;application/json&apos;))
+ sampler.addNonEncodedArgument(&apos;&apos;,vars.get(&apos;action_body&apos;),&apos;&apos;)
+ sampler.setPostBodyRaw(true)
+}
+sampler.setHeaderManager(headers)
+</stringProp>
+          </JSR223PreProcessor>
+          <hashTree/>
+          <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Старт" enabled="true">
+            <intProp name="groupSize">0</intProp>
+            <longProp name="timeoutInMs">30000</longProp>
+          </SyncTimer>
+          <hashTree/>
+          <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Сохранить ответы для общего итога" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">
+def code=prev.responseCode
+boolean ok=code ==~ /2\d\d/
+def allowed=vars.get(&apos;conflict_codes&apos;).split(&apos;,&apos;).collect {it.trim()}
+int s=vars.get(&apos;scenario&apos;).toInteger()
+boolean expected=ok || (s!=1 &amp;&amp; (allowed.contains(code) || (s in [3,4] &amp;&amp; code==&apos;404&apos;)))
+prev.setSuccessful(expected)
+props.get(&apos;is_lab_results_&apos;+s).put(ctx.getThreadNum(),[code:code,ok:ok,expected:expected,operation:vars.get(&apos;operation&apos;)])
+if(ok &amp;&amp; vars.get(&apos;operation&apos;)==&apos;create&apos;) {
+ try { vars.put(&apos;target_id&apos;,new groovy.json.JsonSlurper().parseText(prev.responseDataAsString).id.toString()) }
+ catch(Exception ignored) { log.warn(&apos;Не удалось извлечь id созданного Ticket: проверьте формат ответа&apos;) }
+}
+if(vars.get(&apos;import_file&apos;)) new File(vars.get(&apos;import_file&apos;)).delete()
+</stringProp>
+          </JSR223PostProcessor>
+          <hashTree/>
+        </hashTree>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="Итог" enabled="true">
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="script">
+int s=vars.get(&apos;scenario&apos;).toInteger()
+def results=props.get(&apos;is_lab_results_&apos;+s)
+int expected=ctx.getThreadGroup().getNumThreads()
+def all=results.values().toList()
+int success=all.count {it.ok}
+boolean passed=all.size()==expected &amp;&amp; all.every {it.expected}
+if(s in [5,6,7]) passed=passed &amp;&amp; success==1
+if(s in [2,3,4]) passed=passed &amp;&amp; success&gt;=1
+SampleResult.setSuccessful(passed)
+SampleResult.setResponseCode(passed ? &apos;200&apos; : &apos;ASSERTION_FAILED&apos;)
+SampleResult.setResponseData(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
+ scenario:s,marker:vars.get(&apos;test_name&apos;),responses:results,successCount:success,
+ note:&apos;Проверены HTTP-ответы. Уникальность и откат подтвердите в БД. Два успешных UPDATE не доказывают lost update.&apos;
+])), &apos;UTF-8&apos;)
+</stringProp>
+        </JSR223Sampler>
+        <hashTree>
+          <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Финиш" enabled="true">
+            <intProp name="groupSize">0</intProp>
+            <longProp name="timeoutInMs">30000</longProp>
+          </SyncTimer>
+          <hashTree/>
+        </hashTree>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="7 Два одинаковых импорта (уникальность и откат)" enabled="false">
+        <intProp name="ThreadGroup.num_threads">2</intProp>
+        <intProp name="ThreadGroup.ramp_time">0</intProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController">
+          <stringProp name="LoopController.loops">1</stringProp>
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+        </elementProp>
+      </ThreadGroup>
+      <hashTree>
+        <CookieManager guiclass="CookiePanel" testclass="CookieManager" testname="Отдельная сессия каждого потока" enabled="true">
+          <collectionProp name="CookieManager.cookies"/>
+          <boolProp name="CookieManager.clearEachIteration">true</boolProp>
+          <boolProp name="CookieManager.controlledByThreadGroup">false</boolProp>
+        </CookieManager>
+        <hashTree/>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="Подготовка и проверка настроек" enabled="true">
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="script">import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+int scenario = 7
+ 
+try {
+ int index = ctx.getThreadNum()
+ String run = props.get(&apos;is_lab_run&apos;)
+ assert run : &apos;Включите служебную группу 00&apos;
+ def parse = { String key -&gt;
+   def data = new JsonSlurper().parseText(vars.get(key))
+   assert data instanceof Map &amp;&amp; !data.isEmpty() : &apos;Заполните &apos;+key+&apos; валидным JSON DTO&apos;
+   data
+ }
+ def users = new JsonSlurper().parseText(vars.get(&apos;users_json&apos;))
+ assert users.size() &gt;= 2 &amp;&amp; users[0].username != users[1].username : &apos;Нужны два разных пользователя&apos;
+ assert !vars.get(&apos;users_json&apos;).contains(&apos;FILL_&apos;) : &apos;Заполните users_json&apos;
+ vars.put(&apos;login_body&apos;,JsonOutput.toJson(users[index % users.size()]))
+ vars.put(&apos;scenario&apos;,scenario.toString())
+ vars.put(&apos;test_name&apos;,&apos;JM_&apos;+run+&apos;_S&apos;+scenario)
+ String operation = scenario == 1 ? [&apos;create&apos;,&apos;update&apos;,&apos;delete&apos;,&apos;import&apos;][index] :
+   scenario == 2 ? &apos;update&apos; : scenario == 3 ? (index == 0 ? &apos;update&apos; : &apos;delete&apos;) :
+   scenario == 4 ? &apos;delete&apos; : scenario == 5 ? &apos;event&apos; : scenario == 6 ? &apos;venue&apos; : &apos;import&apos;
+ vars.put(&apos;operation&apos;,operation)
+ String idKey = scenario == 1 ? (operation == &apos;update&apos; ? &apos;crud_update_id&apos; : &apos;crud_delete_id&apos;) :
+   scenario == 2 ? &apos;update_same_id&apos; : scenario == 3 ? &apos;update_delete_id&apos; : &apos;delete_same_id&apos;
+ String id = vars.get(idKey)
+ if (operation in [&apos;update&apos;,&apos;delete&apos;]) assert id?.isInteger() &amp;&amp; id.toInteger()&gt;0 : &apos;Заполните &apos;+idKey
+ vars.put(&apos;target_id&apos;,id ?: &apos;&apos;)
+ String path = vars.get(&apos;tickets_path&apos;)
+ String method = &apos;POST&apos;
+ def body = null
+ switch(operation) {
+ case &apos;create&apos;: body=parse(&apos;ticket_create_json&apos;); body.name=vars.get(&apos;test_name&apos;)+&apos;_CREATE&apos;; break
+ case &apos;update&apos;: path+=&apos;/&apos;+id; method=vars.get(&apos;update_method&apos;); body=parse(&apos;ticket_update_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_USER&apos;+(index+1);break
+ case &apos;delete&apos;: path+=&apos;/&apos;+id;method=&apos;DELETE&apos;;break
+ case &apos;event&apos;:path=vars.get(&apos;events_path&apos;);body=parse(&apos;event_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_EVENT&apos;;break
+ case &apos;venue&apos;:path=vars.get(&apos;venues_path&apos;);body=parse(&apos;venue_json&apos;);body.name=vars.get(&apos;test_name&apos;)+&apos;_VENUE&apos;;break
+ case &apos;import&apos;:
+   path=vars.get(&apos;import_path&apos;)
+   String raw=vars.get(&apos;import_json&apos;)
+   parse(&apos;import_json&apos;)
+   assert raw.contains(&apos;@EVENT@&apos;) &amp;&amp; raw.contains(&apos;@VENUE@&apos;) : &apos;Добавьте @EVENT@ и @VENUE@ в имена объектов import_json&apos;
+   raw=raw.replace(&apos;@EVENT@&apos;,vars.get(&apos;test_name&apos;)+&apos;_EVENT&apos;).replace(&apos;@VENUE@&apos;,vars.get(&apos;test_name&apos;)+&apos;_VENUE&apos;)
+   def file=File.createTempFile(&apos;is-lab-import-&apos;,&apos;.json&apos;);file.setText(raw,&apos;UTF-8&apos;);file.deleteOnExit()
+   vars.put(&apos;import_file&apos;,file.absolutePath)
+   break
+ }
+ vars.put(&apos;action_path&apos;,path);vars.put(&apos;action_method&apos;,method)
+ vars.put(&apos;action_body&apos;,body == null ? &apos;&apos; : JsonOutput.toJson(body))
+ SampleResult.setSuccessful(true)
+ SampleResult.setResponseData(&apos;Scenario &apos;+scenario+&apos; / &apos;+operation+&apos; / &apos;+vars.get(&apos;test_name&apos;),&apos;UTF-8&apos;)
+} catch (Throwable ex) {
+ SampleResult.setSuccessful(false);SampleResult.setResponseCode(&apos;CONFIG_ERROR&apos;)
+ SampleResult.setResponseMessage(ex.message);SampleResult.setStopThread(true)
+}
+</stringProp>
+        </JSR223Sampler>
+        <hashTree/>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Login" enabled="true">
+          <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+          <intProp name="HTTPSampler.response_timeout">30000</intProp>
+          <stringProp name="HTTPSampler.domain">${host}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">${login_path}</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">${login_body}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+          <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="JSON Content-Type" enabled="true">
+            <collectionProp name="HeaderManager.headers">
+              <elementProp name="" elementType="Header">
+                <stringProp name="Header.name">Content-Type</stringProp>
+                <stringProp name="Header.value">application/json</stringProp>
+              </elementProp>
+            </collectionProp>
+          </HeaderManager>
+          <hashTree/>
+          <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Не продолжать при ошибке входа" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">if (!(prev.responseCode ==~ /2\d\d/)) {
+ prev.setSuccessful(false);prev.setStopThread(true)
+}
+</stringProp>
+          </JSR223PostProcessor>
+          <hashTree/>
+        </hashTree>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Конкурентные операции" enabled="true">
+          <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+          <intProp name="HTTPSampler.response_timeout">30000</intProp>
+          <stringProp name="HTTPSampler.domain">${host}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">${action_path}</stringProp>
+          <stringProp name="HTTPSampler.method">${action_method}</stringProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+            <collectionProp name="Arguments.arguments"/>
+          </elementProp>
+          <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="JSON или multipart из встроенного шаблона" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">
+import org.apache.jmeter.protocol.http.control.HeaderManager
+import org.apache.jmeter.protocol.http.control.Header
+import org.apache.jmeter.protocol.http.util.HTTPFileArg
+def headers=new HeaderManager()
+headers.add(new Header(&apos;Accept&apos;,&apos;application/json&apos;))
+sampler.getArguments().removeAllArguments()
+sampler.setHTTPFiles(new HTTPFileArg[0])
+sampler.setDoMultipartPost(false);sampler.setPostBodyRaw(false)
+if(vars.get(&apos;operation&apos;)==&apos;import&apos;) {
+ sampler.setDoMultipartPost(true)
+ sampler.setHTTPFiles([new HTTPFileArg(vars.get(&apos;import_file&apos;),vars.get(&apos;import_part&apos;),&apos;application/json&apos;)] as HTTPFileArg[])
+} else if(vars.get(&apos;action_body&apos;)) {
+ headers.add(new Header(&apos;Content-Type&apos;,&apos;application/json&apos;))
+ sampler.addNonEncodedArgument(&apos;&apos;,vars.get(&apos;action_body&apos;),&apos;&apos;)
+ sampler.setPostBodyRaw(true)
+}
+sampler.setHeaderManager(headers)
+</stringProp>
+          </JSR223PreProcessor>
+          <hashTree/>
+          <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Старт" enabled="true">
+            <intProp name="groupSize">0</intProp>
+            <longProp name="timeoutInMs">30000</longProp>
+          </SyncTimer>
+          <hashTree/>
+          <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Сохранить ответы для общего итога" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">
+def code=prev.responseCode
+boolean ok=code ==~ /2\d\d/
+def allowed=vars.get(&apos;conflict_codes&apos;).split(&apos;,&apos;).collect {it.trim()}
+int s=vars.get(&apos;scenario&apos;).toInteger()
+boolean expected=ok || (s!=1 &amp;&amp; (allowed.contains(code) || (s in [3,4] &amp;&amp; code==&apos;404&apos;)))
+prev.setSuccessful(expected)
+props.get(&apos;is_lab_results_&apos;+s).put(ctx.getThreadNum(),[code:code,ok:ok,expected:expected,operation:vars.get(&apos;operation&apos;)])
+if(ok &amp;&amp; vars.get(&apos;operation&apos;)==&apos;create&apos;) {
+ try { vars.put(&apos;target_id&apos;,new groovy.json.JsonSlurper().parseText(prev.responseDataAsString).id.toString()) }
+ catch(Exception ignored) { log.warn(&apos;Не удалось извлечь id созданного Ticket: проверьте формат ответа&apos;) }
+}
+if(vars.get(&apos;import_file&apos;)) new File(vars.get(&apos;import_file&apos;)).delete()
+</stringProp>
+          </JSR223PostProcessor>
+          <hashTree/>
+        </hashTree>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="Итог" enabled="true">
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="script">
+int s=vars.get(&apos;scenario&apos;).toInteger()
+def results=props.get(&apos;is_lab_results_&apos;+s)
+int expected=ctx.getThreadGroup().getNumThreads()
+def all=results.values().toList()
+int success=all.count {it.ok}
+boolean passed=all.size()==expected &amp;&amp; all.every {it.expected}
+if(s in [5,6,7]) passed=passed &amp;&amp; success==1
+if(s in [2,3,4]) passed=passed &amp;&amp; success&gt;=1
+SampleResult.setSuccessful(passed)
+SampleResult.setResponseCode(passed ? &apos;200&apos; : &apos;ASSERTION_FAILED&apos;)
+SampleResult.setResponseData(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
+ scenario:s,marker:vars.get(&apos;test_name&apos;),responses:results,successCount:success,
+ note:&apos;Проверены HTTP-ответы. Уникальность и откат подтвердите в БД. Два успешных UPDATE не доказывают lost update.&apos;
+])), &apos;UTF-8&apos;)
+</stringProp>
+        </JSR223Sampler>
+        <hashTree>
+          <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Конец" enabled="true">
+            <intProp name="groupSize">0</intProp>
+            <longProp name="timeoutInMs">30000</longProp>
+          </SyncTimer>
+          <hashTree/>
+        </hashTree>
+      </hashTree>
+      <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+        <objProp>
+          <name>saveConfig</name>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>false</responseData>
+            <samplerData>false</samplerData>
+            <xml>false</xml>
+            <fieldNames>true</fieldNames>
+            <responseHeaders>false</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>false</responseDataOnError>
+            <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+            <sentBytes>true</sentBytes>
+            <url>true</url>
+            <threadCounts>true</threadCounts>
+            <idleTime>true</idleTime>
+            <connectTime>true</connectTime>
+          </value>
+        </objProp>
+        <stringProp name="filename"></stringProp>
+      </ResultCollector>
+      <hashTree/>
+      <ResultCollector guiclass="SummaryReport" testclass="ResultCollector" testname="Summary Report" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+        <objProp>
+          <name>saveConfig</name>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>false</responseData>
+            <samplerData>false</samplerData>
+            <xml>false</xml>
+            <fieldNames>true</fieldNames>
+            <responseHeaders>false</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>false</responseDataOnError>
+            <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+            <sentBytes>true</sentBytes>
+            <url>true</url>
+            <threadCounts>true</threadCounts>
+            <idleTime>true</idleTime>
+            <connectTime>true</connectTime>
+          </value>
+        </objProp>
+        <stringProp name="filename"></stringProp>
+      </ResultCollector>
+      <hashTree/>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="08 Два Event: переименование в одинаковое имя">
+        <intProp name="ThreadGroup.num_threads">2</intProp>
+        <intProp name="ThreadGroup.ramp_time">0</intProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController">
+          <stringProp name="LoopController.loops">1</stringProp>
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+        </elementProp>
+      </ThreadGroup>
+      <hashTree>
+        <CookieManager guiclass="CookiePanel" testclass="CookieManager" testname="Отдельная сессия каждого потока" enabled="true">
+          <collectionProp name="CookieManager.cookies"/>
+          <boolProp name="CookieManager.clearEachIteration">true</boolProp>
+          <boolProp name="CookieManager.controlledByThreadGroup">false</boolProp>
+        </CookieManager>
+        <hashTree/>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="Подготовка и проверка настроек" enabled="true">
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="script">import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+try {
+ assert ctx.getThreadGroup().getNumThreads()==2 : &apos;Сценарий 08 требует ровно два потока&apos;
+ int index=ctx.getThreadNum()
+ String run=props.get(&apos;is_lab_run&apos;)
+ assert run : &apos;Включите служебную инициализацию&apos;
+ def ids=[vars.get(&apos;event_update_id_1&apos;),vars.get(&apos;event_update_id_2&apos;)]
+ assert ids.every { it?.isInteger() &amp;&amp; it.toInteger()&gt;0 } : &apos;Заполните event_update_id_1 и event_update_id_2&apos;
+ assert ids[0].toInteger()!=ids[1].toInteger() : &apos;Нужны РАЗНЫЕ Event ID&apos;
+ def users=new JsonSlurper().parseText(vars.get(&apos;users_json&apos;))
+ assert users.size()&gt;=2 &amp;&amp; users[0].username!=users[1].username : &apos;Нужны два разных пользователя&apos;
+ assert !vars.get(&apos;users_json&apos;).contains(&apos;FILL_&apos;) : &apos;Заполните users_json&apos;
+ vars.put(&apos;login_body&apos;,JsonOutput.toJson(users[index]))
+ vars.put(&apos;scenario&apos;,&apos;8&apos;);vars.put(&apos;operation&apos;,&apos;event_update&apos;)
+ vars.put(&apos;test_name&apos;,&apos;JM_&apos;+run+&apos;_S8&apos;)
+ vars.put(&apos;target_name&apos;,vars.get(&apos;test_name&apos;)+&apos;_EVENT&apos;)
+ vars.put(&apos;target_id&apos;,ids[index])
+ vars.put(&apos;action_path&apos;,vars.get(&apos;events_path&apos;)+&apos;/&apos;+ids[index])
+ vars.put(&apos;action_method&apos;,vars.get(&apos;event_update_method&apos;))
+ String raw=vars.get(&apos;event_update_json&apos;)?.trim()
+ def body=new JsonSlurper().parseText(raw ? raw : vars.get(&apos;event_json&apos;))
+ assert body instanceof Map &amp;&amp; !body.isEmpty() : &apos;Заполните JSON DTO события&apos;
+ body.name=vars.get(&apos;target_name&apos;)
+ vars.put(&apos;action_body&apos;,JsonOutput.toJson(body))
+ SampleResult.setSuccessful(true);SampleResult.setResponseCode(&apos;200&apos;)
+ SampleResult.setResponseData(&apos;Event ID=&apos;+ids[index]+&apos;; targetName=&apos;+vars.get(&apos;target_name&apos;),&apos;UTF-8&apos;)
+} catch(Throwable ex) {
+ SampleResult.setSuccessful(false);SampleResult.setResponseCode(&apos;CONFIG_ERROR&apos;)
+ SampleResult.setResponseMessage(ex.message);SampleResult.setStopThread(true)
+}</stringProp>
+        </JSR223Sampler>
+        <hashTree/>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Login" enabled="true">
+          <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+          <intProp name="HTTPSampler.response_timeout">30000</intProp>
+          <stringProp name="HTTPSampler.domain">${host}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">${login_path}</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">${login_body}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+          <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="JSON Content-Type" enabled="true">
+            <collectionProp name="HeaderManager.headers">
+              <elementProp name="" elementType="Header">
+                <stringProp name="Header.name">Content-Type</stringProp>
+                <stringProp name="Header.value">application/json</stringProp>
+              </elementProp>
+            </collectionProp>
+          </HeaderManager>
+          <hashTree/>
+          <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Не продолжать при ошибке входа" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">if (!(prev.responseCode ==~ /2\d\d/)) {
+ prev.setSuccessful(false);prev.setStopThread(true)
+}
+</stringProp>
+          </JSR223PostProcessor>
+          <hashTree/>
+        </hashTree>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET исходный Event">
+          <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+          <intProp name="HTTPSampler.response_timeout">30000</intProp>
+          <stringProp name="HTTPSampler.domain">${host}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">${action_path}</stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+            <collectionProp name="Arguments.arguments"/>
+          </elementProp>
+          <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Проверить исходное имя" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">try {
+ assert prev.responseCode==&apos;200&apos; : &apos;Исходный Event не прочитан: HTTP &apos;+prev.responseCode
+ def data=new groovy.json.JsonSlurper().parseText(prev.responseDataAsString)
+ assert data.name instanceof String : &apos;Ожидается поле name в корне ответа&apos;
+ assert data.name!=vars.get(&apos;target_name&apos;) : &apos;Тестовое имя уже занято этим Event&apos;
+ vars.put(&apos;original_event_name&apos;,data.name)
+} catch(Throwable ex) {
+ prev.setSuccessful(false);prev.setResponseMessage(ex.message);prev.setStopThread(true)
+}</stringProp>
+          </JSR223PostProcessor>
+          <hashTree/>
+        </hashTree>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Конкурентная операция" enabled="true">
+          <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+          <intProp name="HTTPSampler.response_timeout">30000</intProp>
+          <stringProp name="HTTPSampler.domain">${host}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">${action_path}</stringProp>
+          <stringProp name="HTTPSampler.method">${action_method}</stringProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+            <collectionProp name="Arguments.arguments"/>
+          </elementProp>
+          <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="JSON или multipart из встроенного шаблона" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">
+import org.apache.jmeter.protocol.http.control.HeaderManager
+import org.apache.jmeter.protocol.http.control.Header
+import org.apache.jmeter.protocol.http.util.HTTPFileArg
+def headers=new HeaderManager()
+headers.add(new Header(&apos;Accept&apos;,&apos;application/json&apos;))
+sampler.getArguments().removeAllArguments()
+sampler.setHTTPFiles(new HTTPFileArg[0])
+sampler.setDoMultipartPost(false);sampler.setPostBodyRaw(false)
+if(vars.get(&apos;operation&apos;)==&apos;import&apos;) {
+ sampler.setDoMultipartPost(true)
+ sampler.setHTTPFiles([new HTTPFileArg(vars.get(&apos;import_file&apos;),vars.get(&apos;import_part&apos;),&apos;application/json&apos;)] as HTTPFileArg[])
+} else if(vars.get(&apos;action_body&apos;)) {
+ headers.add(new Header(&apos;Content-Type&apos;,&apos;application/json&apos;))
+ sampler.addNonEncodedArgument(&apos;&apos;,vars.get(&apos;action_body&apos;),&apos;&apos;)
+ sampler.setPostBodyRaw(true)
+}
+sampler.setHeaderManager(headers)
+</stringProp>
+          </JSR223PreProcessor>
+          <hashTree/>
+          <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Старт" enabled="true">
+            <intProp name="groupSize">0</intProp>
+            <longProp name="timeoutInMs">30000</longProp>
+          </SyncTimer>
+          <hashTree/>
+          <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Сохранить ответы для общего итога" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">
+def code=prev.responseCode
+boolean ok=code ==~ /2\d\d/
+def allowed=vars.get(&apos;conflict_codes&apos;).split(&apos;,&apos;).collect {it.trim()}
+int s=vars.get(&apos;scenario&apos;).toInteger()
+boolean expected=ok || (s!=1 &amp;&amp; (allowed.contains(code) || (s in [3,4] &amp;&amp; code==&apos;404&apos;)))
+prev.setSuccessful(expected)
+props.get(&apos;is_lab_results_&apos;+s).put(ctx.getThreadNum(),[code:code,ok:ok,expected:expected,operation:vars.get(&apos;operation&apos;)])
+if(ok &amp;&amp; vars.get(&apos;operation&apos;)==&apos;create&apos;) {
+ try { vars.put(&apos;target_id&apos;,new groovy.json.JsonSlurper().parseText(prev.responseDataAsString).id.toString()) }
+ catch(Exception ignored) { log.warn(&apos;Не удалось извлечь id созданного Ticket: проверьте формат ответа&apos;) }
+}
+if(vars.get(&apos;import_file&apos;)) new File(vars.get(&apos;import_file&apos;)).delete()
+</stringProp>
+          </JSR223PostProcessor>
+          <hashTree/>
+        </hashTree>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="Итог" enabled="true">
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="script">
+int s=vars.get(&apos;scenario&apos;).toInteger()
+def results=props.get(&apos;is_lab_results_&apos;+s)
+int expected=ctx.getThreadGroup().getNumThreads()
+def all=results.values().toList()
+int success=all.count {it.ok}
+boolean passed=all.size()==expected &amp;&amp; all.every {it.expected}
+if(s in [5,6,7,8]) passed=passed &amp;&amp; success==1
+if(s in [2,3,4]) passed=passed &amp;&amp; success&gt;=1
+SampleResult.setSuccessful(passed)
+SampleResult.setResponseCode(passed ? &apos;200&apos; : &apos;ASSERTION_FAILED&apos;)
+SampleResult.setResponseData(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
+ scenario:s,marker:vars.get(&apos;test_name&apos;),responses:results,successCount:success,
+ targetName:vars.get(&apos;target_name&apos;), note:&apos;Ровно один PUT должен быть успешным. Далее проверяются имена обоих Event; дополнительно проверьте уникальность SQL-запросом.&apos;
+])), &apos;UTF-8&apos;)
+</stringProp>
+        </JSR223Sampler>
+        <hashTree>
+          <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Финиш" enabled="true">
+            <intProp name="groupSize">0</intProp>
+            <longProp name="timeoutInMs">30000</longProp>
+          </SyncTimer>
+          <hashTree/>
+        </hashTree>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET Event после переименования">
+          <intProp name="HTTPSampler.connect_timeout">10000</intProp>
+          <intProp name="HTTPSampler.response_timeout">30000</intProp>
+          <stringProp name="HTTPSampler.domain">${host}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">${action_path}</stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+            <collectionProp name="Arguments.arguments"/>
+          </elementProp>
+          <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <JSR223Assertion guiclass="TestBeanGUI" testclass="JSR223Assertion" testname="Успешный Event переименован, отклонённый сохранил имя" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="script">try {
+ assert prev.responseCode==&apos;200&apos; : &apos;Итоговый Event недоступен: HTTP &apos;+prev.responseCode
+ def data=new groovy.json.JsonSlurper().parseText(prev.responseDataAsString)
+ def result=props.get(&apos;is_lab_results_8&apos;).get(ctx.getThreadNum())
+ assert result!=null : &apos;Нет результата PUT&apos;
+ String expected=result.ok ? vars.get(&apos;target_name&apos;) : vars.get(&apos;original_event_name&apos;)
+ assert data.name==expected : &apos;Ожидалось имя &apos;+expected+&apos;, получено &apos;+data.name
+} catch(Throwable ex) {
+ AssertionResult.setFailure(true);AssertionResult.setFailureMessage(ex.message)
+}</stringProp>
+          </JSR223Assertion>
+          <hashTree/>
+        </hashTree>
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>
