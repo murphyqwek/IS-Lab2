@@ -50,12 +50,12 @@ public class VenueService {
         return venueMapper.toResponse(find(id));
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public VenueResponse create(VenueRequest request) {
         return venueMapper.toResponse(createEntity(request));
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public Venue resolve(VenueReferenceRequest request) {
         if (request == null) {
             throw new InvalidReferenceException("Поле 'venue' не может быть null");
@@ -70,7 +70,7 @@ public class VenueService {
         return createEntity(request.newObject());
     }
 
-    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public VenueResponse update(Integer id, VenueRequest request) {
         if(isVenueNameTakenByAnotherEvent(request.name(), id)) {
             throw new BusinessConstraintsException("Venue с названием " + request.name() + " уже есть. Выберите другое название");

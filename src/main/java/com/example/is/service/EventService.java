@@ -50,12 +50,12 @@ public class EventService {
         return eventMapper.toResponse(find(id));
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public EventResponse create(EventRequest request) {
         return eventMapper.toResponse(createEntity(request));
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public Event resolve(EventReferenceRequest request) {
         if (request == null) {
             throw new InvalidReferenceException("Поле 'event' не может быть null");
@@ -70,7 +70,7 @@ public class EventService {
         return createEntity(request.newObject());
     }
 
-    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public EventResponse update(Integer id, EventRequest request) {
         if(isEventNameTakenByAnotherEvent(request.name(), id)) {
             throw new BusinessConstraintsException("Event с названием " + request.name() + " уже есть. Выберите другое название");

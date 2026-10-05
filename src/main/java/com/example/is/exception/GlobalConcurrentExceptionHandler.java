@@ -1,7 +1,7 @@
 package com.example.is.exception;
 
 import org.springframework.dao.DataAccessException;
-import org.springframework.dao.TransientDataAccessException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.TransactionSystemException;
@@ -30,6 +30,15 @@ public class GlobalConcurrentExceptionHandler {
                 .body(Map.of(
                         "message",
                         "Не удалось выполнить операцию с базой данных"
+                ));
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<Map<String, String>> handleOptimisticLocking(OptimisticLockingFailureException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of(
+                        "message",
+                        "Объект был изменён или удалён другим пользователем. Обновите данные"
                 ));
     }
 

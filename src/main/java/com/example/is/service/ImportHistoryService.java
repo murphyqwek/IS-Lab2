@@ -96,7 +96,7 @@ public class ImportHistoryService {
         );
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRED)
     public void saveSuccess(String username, int countAdded) {
         ImportHistory importHistory = new ImportHistory();
 
