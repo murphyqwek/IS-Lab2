@@ -64,3 +64,18 @@ tasks.register<Exec>("dockerComposeDown") {
     workingDir(projectDir)
     commandLine("docker", "compose", "down")
 }
+
+tasks.register<Exec>("compileFrontend") {
+    group = "infrastructre"
+    description = "Compile Angular and copy to resources"
+
+    workingDir = file("frontend/frontend")
+
+    commandLine(
+        "cmd",
+        "/c",
+        "npm",
+        "run",
+        "build",
+    )
+}
